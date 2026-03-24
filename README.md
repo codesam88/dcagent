@@ -30,10 +30,11 @@ uv run dc-agent init DCACCOUNT:https://nine.testrun.org/new
 > ```bash
 > uv run dc-agent init --email bot@example.com --password MyPassword
 > ```
+> For other options see `uv run dcagent --help` or `uv run dcagent init --help`
 
 ### 3. Customise the bot's display name and status
 
-Open `src/dc_echobot/bot.py` and change the `BOT_NAME` constant at the top:
+Open `main.py` and change the `BOT_NAME` constant at the top:
 
 ```python
 BOT_NAME = "My Awesome Bot"   # ← edit this
@@ -42,20 +43,20 @@ BOT_NAME = "My Awesome Bot"   # ← edit this
 Then apply the name to the account:
 
 ```bash
-uv run dc-echobot config displayname "My Awesome Bot"
-uv run dc-echobot config selfstatus "I echo everything you say!"
+uv run dcagent config displayname "My Awesome Bot"
+uv run dcagent config selfstatus "I echo everything you say!"
 ```
 
 Optionally set an avatar:
 
 ```bash
-uv run dc-echobot config selfavatar ./avatar.png
+uv run dcagent config selfavatar ./avatar.png
 ```
 
 ### 4. Get the invite link
 
 ```bash
-uv run dc-echobot link
+uv run dcagent link
 ```
 
 Open the printed URL in your Delta Chat app (or scan the QR code in a browser) to start a chat with the bot.
@@ -63,22 +64,10 @@ Open the printed URL in your Delta Chat app (or scan the QR code in a browser) t
 ### 5. Run the bot
 
 ```bash
-uv run dc-echobot serve
+uv run dcagent serve
 ```
 
 Send a message to the bot in your Delta Chat app — it will echo it right back!
-
-## Project structure
-
-```
-dc-echobot/
-├── pyproject.toml          # project metadata and dependencies
-├── README.md
-└── src/
-    └── dc_echobot/
-        ├── __init__.py
-        └── bot.py          # all bot logic lives here
-```
 
 ## Customisation
 
@@ -94,7 +83,7 @@ dc-echobot/
 Run with verbose logging:
 
 ```bash
-RUST_LOG=info uv run dc-echobot serve
+RUST_LOG=info uv run dcagent serve
 ```
 
 ## References
