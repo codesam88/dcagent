@@ -18,6 +18,7 @@ run:
 test:
 	uv run ruff check
 	uv run pytest
+	pre-commit run --all-files
 
 # Auto-format code
 format:
