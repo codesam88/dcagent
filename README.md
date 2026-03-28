@@ -1,12 +1,15 @@
 # dcagent
 
-A Delta Chat agent that echoes messages and accepts external commands via a Unix named pipe.
+`dcagent` is a lightweight agent for monitoring Linux systems. It provides
+out-of-band heartbeat and alerting for small or privately managed networks.
 
-## Features
+`dcagent` leverages the [Delta Chat](https://delta.chat) messaging system,
+where accounts are free and nobody judges you for talking to bots.
 
-- **Echo bot**: Responds with the same text it receives
-- **Commands**: `/help` and `/ping` supported
-- **External control**: Accepts JSON commands via Unix named pipe for automation
+**Features:**
+- **Heartbeat** — bots can monitor each other over a dedicated channel
+- **Alerts** — send notifications to an admin or group chat
+- **Pipe relay** — local programs send messages via a Unix named pipe
 
 ## Requirements
 
@@ -81,24 +84,19 @@ Then send commands:
 echo '{"cmd": "send", "chat_id": 12, "text": "alert!"}' > /tmp/dcagent.pipe
 ```
 
-## Customisation
-
-| What | Where |
-|------|-------|
-| Agent display name | `DEFAULT_BOT_NAME` constant in `main.py` (line 44) |
-| Add a new command | `@cli.on(events.NewMessage, command="/yourcommand")` decorator |
-| React to group events | `@cli.on(events.MemberListChanged)` etc. |
-| Full JSON-RPC API | [api.rs source](https://github.com/deltachat/core/blob/main/deltachat-jsonrpc/src/api.rs) / [TypeScript docs](https://js.jsonrpc.delta.chat/classes/RawClient.html) |
-
 ## Development
 
-### Project structure
+## Project Structure
 
 ```
 dcagent/
-├── main.py         # Single-file bot with all logic
-├── pyproject.toml  # Python project config + ruff linting
-└── README.md       # This file
+├── main.py           # Single-file bot (all logic here)
+├── test_dcagent.py   # Pytest test suite
+├── pyproject.toml    # Project config, dependencies, ruff settings
+├── Makefile          # Developer shortcuts
+├── README.md         # User documentation
+├── AGENTS.md         # This file - agent guidance
+└── uv.lock
 ```
 
 ### Useful commands
