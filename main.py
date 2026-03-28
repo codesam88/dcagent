@@ -47,7 +47,7 @@ DEFAULT_BOT_NAME = "dcagent"
 # CLI setup
 # ---------------------------------------------------------------------------
 
-cli = BotCli("dcagent")
+cli = BotCli(DEFAULT_BOT_NAME)
 
 
 @cli.on_start
@@ -55,7 +55,8 @@ def on_start(bot, args) -> None:
     """Launch the pipe listener thread."""
 
     if args.pipe:
-        t = threading.Thread(target=_pipe_listener, args=(args.pipe,), name="pipe-listener", daemon=True)
+        accid = bot.rpc.get_all_account_ids()[0]
+        t = threading.Thread(target=_pipe_listener, args=(args.pipe, accid), name="pipe-listener", daemon=True)
         t.start()
         logger.info("Pipe listener started on %s", args.pipe)
 
@@ -76,7 +77,7 @@ def _ensure_pipe(path: str) -> None:
         os.mkfifo(path)
 
 
-def _pipe_listener(path: str) -> None:
+def _pipe_listener(path: str, accid: int) -> None:
     """
     Blocking loop that reads newline-delimited JSON commands from the named pipe.
 
@@ -95,7 +96,7 @@ def _pipe_listener(path: str) -> None:
                 if not raw:
                     continue
                 try:
-                    _dispatch(json.loads(raw))
+                    _dispatch(json.loads(raw), accid)
                 except json.JSONDecodeError as exc:
                     logger.error("Invalid JSON on pipe: %s — %s", raw, exc)
                 except Exception as exc:
@@ -104,16 +105,16 @@ def _pipe_listener(path: str) -> None:
         logger.debug("Pipe writer disconnected, waiting for next writer")
 
 
-def _dispatch(cmd: dict) -> None:
+def _dispatch(cmd: dict, accid: int) -> None:
     """Route a parsed command dict to the appropriate handler."""
     kind = cmd.get("cmd")
     if kind == "send":
-        _cmd_send(cmd)
+        _cmd_send(accid, cmd)
     else:
         logger.warning("Unknown pipe command: %r", kind)
 
 
-def _cmd_send(cmd: dict) -> None:
+def _cmd_send(accid: int, cmd: dict) -> None:
     """Handle {"cmd": "send", "chat_id": <int>, "text": "<str>"}."""
     chat_id = cmd.get("chat_id")
     text = cmd.get("text", "")
@@ -122,10 +123,9 @@ def _cmd_send(cmd: dict) -> None:
         logger.error("send command missing chat_id or text: %r", cmd)
         return
 
-    rpc = cli._bot.rpc  # noqa: SLF001
-    accid = rpc.get_all_account_ids()[0]
-    rpc.send_msg(accid, chat_id, MsgData(text=text))
-    logger.info("Sent message to chat %s: %r", chat_id, text[:80])
+    # BotCli exposes no public send API, so we access rpc here via the private cli._bot
+    cli._bot.rpc.send_msg(accid, chat_id, MsgData(text=text))  # noqa: SLF001
+    logger.info("Sent message to chat %s: %r", chat_id, text[:80] + "...")
 
 
 # ---------------------------------------------------------------------------
@@ -142,8 +142,8 @@ def on_new_message(bot, accid: int, event) -> None:
     if not msg.text or msg.is_bot:
         return
 
-    logger.info("Received message in chat %s: %r", msg.chat_id, msg.text[:80])
     bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=msg.text))
+    logger.info("Received message in chat %s: %r", msg.chat_id, msg.text[:80] + "...")
 
 
 @cli.on(events.NewMessage(command="/help"))

@@ -1,12 +1,16 @@
-# dc-agent
+# dcagent
 
-A simple Delta Chat echo bot built with the [JSON-RPC Python bindings](https://py.delta.chat/jsonrpc/install.html).
+A Delta Chat agent that echoes messages and accepts external commands via a Unix named pipe.
 
-It echoes every message sent to it and also responds to `/help` and `/ping` commands.
+## Features
+
+- **Echo bot**: Responds with the same text it receives
+- **Commands**: `/help` and `/ping` supported
+- **External control**: Accepts JSON commands via Unix named pipe for automation
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.12+
 - [uv](https://docs.astral.sh/uv/)
 
 ## Quick start
@@ -19,32 +23,26 @@ uv sync
 
 This installs `deltabot-cli`, `deltachat2`, and `deltachat-rpc-server` (the Delta Chat core binary).
 
-### 2. Create a chatmail account for the bot
+### 2. Create a chatmail account for the agent
 
 ```bash
-uv run dc-agent init DCACCOUNT:https://nine.testrun.org/new
+uv run dcagent init DCACCOUNT:https://nine.testrun.org/new
 ```
 
 > **Tip:** Replace `nine.testrun.org` with any other [chatmail relay](https://chatmail.at/relays) you prefer.
 > You can also use a regular e-mail account:
 > ```bash
-> uv run dc-agent init --email bot@example.com --password MyPassword
+> uv run dcagent init --email bot@example.com --password MyPassword
 > ```
 > For other options see `uv run dcagent --help` or `uv run dcagent init --help`
 
-### 3. Customise the bot's display name and status
+### 3. Configure the agent
 
-Open `main.py` and change the `BOT_NAME` constant at the top:
-
-```python
-BOT_NAME = "My Awesome Bot"   # ← edit this
-```
-
-Then apply the name to the account:
+Set the display name and status:
 
 ```bash
-uv run dcagent config displayname "My Awesome Bot"
-uv run dcagent config selfstatus "I echo everything you say!"
+uv run dcagent config displayname "My Agent"
+uv run dcagent config selfstatus "Agent ready"
 ```
 
 Optionally set an avatar:
@@ -59,31 +57,67 @@ uv run dcagent config selfavatar ./avatar.png
 uv run dcagent link
 ```
 
-Open the printed URL in your Delta Chat app (or scan the QR code in a browser) to start a chat with the bot.
+Open the printed URL in your Delta Chat app (or scan the QR code in a browser) to start a chat with the agent.
 
-### 5. Run the bot
+### 5. Start the agent
 
 ```bash
 uv run dcagent serve
 ```
 
-Send a message to the bot in your Delta Chat app — it will echo it right back!
+Send a message to the agent in your Delta Chat app — it will echo it right back!
+
+### 6. Send external commands
+
+The agent can accept commands from a Unix named pipe. Start with the `--pipe` option:
+
+```bash
+uv run dcagent serve --pipe /tmp/dcagent.pipe
+```
+
+Then send commands:
+
+```bash
+echo '{"cmd": "send", "chat_id": 12, "text": "alert!"}' > /tmp/dcagent.pipe
+```
 
 ## Customisation
 
 | What | Where |
-|---|---|
-| Bot display name | `BOT_NAME` constant in `bot.py` |
+|------|-------|
+| Agent display name | `DEFAULT_BOT_NAME` constant in `main.py` (line 44) |
 | Add a new command | `@cli.on(events.NewMessage, command="/yourcommand")` decorator |
 | React to group events | `@cli.on(events.MemberListChanged)` etc. |
-| Full JSON-RPC API | [api.rs source](https://github.com/chatmail/core/blob/main/deltachat-jsonrpc/src/api.rs) / [TypeScript docs](https://js.jsonrpc.delta.chat/classes/RawClient.html) |
+| Full JSON-RPC API | [api.rs source](https://github.com/deltachat/core/blob/main/deltachat-jsonrpc/src/api.rs) / [TypeScript docs](https://js.jsonrpc.delta.chat/classes/RawClient.html) |
 
 ## Development
 
-Run with verbose logging:
+### Project structure
+
+```
+dcagent/
+├── main.py         # Single-file bot with all logic
+├── pyproject.toml  # Python project config + ruff linting
+└── README.md       # This file
+```
+
+### Useful commands
 
 ```bash
+# Run the agent
+uv run dcagent serve
+
+# Run with verbose logging
 RUST_LOG=info uv run dcagent serve
+
+# Run tests
+uv run pytest -v
+
+# Run linter
+uv run ruff check
+
+# Format code
+uv run ruff format
 ```
 
 ## References
