@@ -46,6 +46,8 @@ def test_dispatch_routing():
         _bot = MockBot()
 
     # Replace cli with mock
+    import logging
+
     import main
 
     original_cli = main.cli
@@ -53,7 +55,7 @@ def test_dispatch_routing():
 
     try:
         # Test send command
-        _dispatch({"cmd": "send", "chat_id": 12, "text": "test"}, 1)
+        _dispatch({"cmd": "send", "chat_id": 12, "text": "test"}, 1, logging.getLogger("test"))
         assert len(main.cli._bot.rpc.sent_messages) == 1
         assert main.cli._bot.rpc.sent_messages[0] == (1, 12, main.cli._bot.rpc.sent_messages[0][2])
         print("✓ _dispatch routes send command correctly")
