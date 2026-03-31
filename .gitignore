@@ -13,3 +13,5 @@ wheels/
 .claude/
 .crush/
 .tmp/
+src/dcagent/*.swp
+*.swp
