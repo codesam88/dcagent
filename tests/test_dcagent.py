@@ -9,11 +9,14 @@ from dcagent.agent import _pipe_forward
 from dcagent.bot import (
     APP_NAME,
     AgentError,
+    _add_admin_chat,
     _add_alert_chat,
     _build_parser,
     _ensure_configured,
+    _get_admin_chats,
     _get_alert_chats,
     _get_or_create_admin_chat,
+    _get_or_create_alert_chat,
 )
 
 # ---------------------------------------------------------------------------
@@ -163,12 +166,56 @@ def test_add_alert_chat_no_duplicate():
     rpc.set_config.assert_called_once_with(1, "ui.alert_chats", "5,7")
 
 
+def test_get_or_create_alert_chat_existing():
+    rpc = MagicMock()
+    rpc.get_config.return_value = "42"
+    chatid = _get_or_create_alert_chat(rpc, accid=1)
+    assert chatid == 42
+    rpc.create_group_chat.assert_not_called()
+
+
+def test_get_or_create_alert_chat_creates_new():
+    rpc = MagicMock()
+    rpc.get_config.return_value = None
+    rpc.create_group_chat.return_value = 55
+    chatid = _get_or_create_alert_chat(rpc, accid=1)
+    assert chatid == 55
+    rpc.create_group_chat.assert_called_once_with(1, "Bot Alerts", True)
+    rpc.set_config.assert_called_once_with(1, "ui.alert_chats", "55")
+
+
 # ---------------------------------------------------------------------------
-# _get_or_create_admin_chat
+# _get_admin_chats / _add_admin_chat / _get_or_create_admin_chat
 # ---------------------------------------------------------------------------
 
 
-def test_get_admin_chat_existing():
+def test_get_admin_chats_empty():
+    rpc = MagicMock()
+    rpc.get_config.return_value = None
+    assert _get_admin_chats(rpc, accid=1) == []
+
+
+def test_get_admin_chats_multiple():
+    rpc = MagicMock()
+    rpc.get_config.return_value = "3,7"
+    assert _get_admin_chats(rpc, accid=1) == [3, 7]
+
+
+def test_add_admin_chat_new():
+    rpc = MagicMock()
+    rpc.get_config.return_value = "3"
+    _add_admin_chat(rpc, accid=1, chat_id=7)
+    rpc.set_config.assert_called_once_with(1, "ui.admin_chats", "3,7")
+
+
+def test_add_admin_chat_no_duplicate():
+    rpc = MagicMock()
+    rpc.get_config.return_value = "3,7"
+    _add_admin_chat(rpc, accid=1, chat_id=7)
+    rpc.set_config.assert_called_once_with(1, "ui.admin_chats", "3,7")
+
+
+def test_get_or_create_admin_chat_existing():
     rpc = MagicMock()
     rpc.get_config.return_value = "7"
     chatid = _get_or_create_admin_chat(rpc, accid=1)
@@ -176,14 +223,14 @@ def test_get_admin_chat_existing():
     rpc.create_group_chat.assert_not_called()
 
 
-def test_get_admin_chat_creates_new():
+def test_get_or_create_admin_chat_creates_new():
     rpc = MagicMock()
     rpc.get_config.return_value = None
     rpc.create_group_chat.return_value = 99
     chatid = _get_or_create_admin_chat(rpc, accid=1)
     assert chatid == 99
     rpc.create_group_chat.assert_called_once_with(1, "Bot Admins", True)
-    rpc.set_config.assert_called_once_with(1, "ui.admin_chat", "99")
+    rpc.set_config.assert_called_once_with(1, "ui.admin_chats", "99")
 
 
 # ---------------------------------------------------------------------------

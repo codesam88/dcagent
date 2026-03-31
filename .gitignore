@@ -18,3 +18,6 @@ tags
 .tmp/
 src/dcagent/*.swp
 *.swp
+
+# e2e test state (persistent bot accounts)
+tests/integration/out/

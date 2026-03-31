@@ -18,7 +18,7 @@ from typing import Optional
 from deltachat2 import Bot, MsgData, Rpc, events
 
 import dcagent.bot as _bot
-from dcagent.bot import APP_NAME, get_addrs
+from dcagent.bot import APP_NAME, AgentError, get_addrs
 
 log = logging.getLogger(__name__)
 
@@ -76,7 +76,15 @@ def _on_new_message(bot: Bot, accid: int, event) -> None:
     msg = event.msg
     if not msg.text:
         return
-    bot.logger.info("Received message in chat %s: %r", msg.chat_id, msg.text[:80])
+
+    if msg.chat_id in _bot._get_alert_chats(bot.rpc, accid):
+        tag = "<alert>"
+    elif msg.chat_id in _bot._get_admin_chats(bot.rpc, accid):
+        tag = "<admin>"
+    else:
+        raise AgentError("Received message was neither from alert nor admin chat")
+
+    bot.logger.info("Received message in chat %s %s: %r", msg.chat_id, tag, msg.text[:80])
 
 
 def _on_help(bot: Bot, accid: int, event) -> None:

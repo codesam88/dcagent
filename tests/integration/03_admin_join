@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+#
+# Test that a pipe message from AGENT is forwarded to OWNER's admin channel.
+# AGENT takes OWNER's admin invite as an alert chat, so pipe messages land there.
+# Requires accounts to be provisioned (00_provision).
+
+set -euo pipefail
+source "$(dirname "$0")/helpers.sh"
+trap cleanup EXIT
+
+echo "==> Getting OWNER admin invite ..."
+INVITE=$($OWNER admin 2>/dev/null | grep '^https://' | head -1)
+echo "    invite=$INVITE"
+
+echo "==> Starting OWNER serve ..."
+> "$OWNER_LOG"
+$OWNER --logging debug serve >> "$OWNER_LOG" 2>&1 &
+OWNER_PID=$!
+wait_for_log "$OWNER_LOG" "Listening at" "$TIMEOUT"
+
+echo "==> AGENT taking admin invite on alert channel ..."
+$AGENT alert "$INVITE" 2>/dev/null
+
+echo "==> Starting AGENT serve ..."
+> "$AGENT_LOG"
+$AGENT serve --pipe "$AGENT_PIPE" >> "$AGENT_LOG" 2>&1 &
+AGENT_PID=$!
+wait_for_log "$AGENT_LOG" "Listening at" "$TIMEOUT"
+wait_for_file "$AGENT_PIPE" 10
+
+echo "==> Sending /help via pipe ..."
+printf '/help\n' > "$AGENT_PIPE"
+
+echo "==> Waiting for OWNER to receive the /help response in ADMIN group..."
+if ! wait_for_log "$OWNER_LOG" "<admin>: '/help'" "$TIMEOUT"; then
+    dump_logs
+    exit 1
+fi
+
+echo "PASS [$0]"

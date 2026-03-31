@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+#
+# Provision OWNER and AGENT accounts.
+# Skips creation if the account has already been provisioned.
+# Run 'make clean' to reset and re-provision from scratch.
+
+set -euo pipefail
+source "$(dirname "$0")/helpers.sh"
+
+for dir in "$OWNER_DIR" "$AGENT_DIR"; do
+    mkdir -p "$dir"
+done
+
+(
+    flock -x 9
+    if [[ -f "$OWNER_PROVISIONED" ]]; then
+        echo "==> OWNER already provisioned, skipping"
+    else
+        echo "==> Provisioning OWNER on $CHATMAIL ..."
+        $OWNER init "DCACCOUNT:$CHATMAIL"
+        $OWNER config displayname "owner"
+        touch "$OWNER_PROVISIONED"
+    fi
+) 9>"$OWNER_LOCK"
+
+(
+    flock -x 9
+    if [[ -f "$AGENT_PROVISIONED" ]]; then
+        echo "==> AGENT already provisioned, skipping"
+    else
+        echo "==> Provisioning AGENT on $CHATMAIL ..."
+        $AGENT init "DCACCOUNT:$CHATMAIL"
+        $AGENT config displayname "agent"
+        touch "$AGENT_PROVISIONED"
+    fi
+) 9>"$AGENT_LOCK"
