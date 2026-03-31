@@ -1,0 +1,324 @@
+"""
+dcagent bot — lifecycle commands, RPC infrastructure, and CLI entry point.
+
+Provides the do_* lifecycle commands (init, config, link, admin, join, serve),
+shared helpers, and main(). run_bot() has a minimal default implementation
+that agent.py overrides with the full handler/pipe stack.
+
+Usage:
+    dcagent [--config-dir PATH] [--logging LEVEL] [--log-file PATH] <subcommand> [args]
+
+Subcommands:
+    init ADDR [PASSWORD]  – configure a new account
+    config [KEY [VALUE]]  – get/set account configuration
+    link                  – print personal invite link
+    admin                 – print admin-group invite link
+    serve [--pipe PATH]   – run the bot (event loop + optional pipe listener)
+    join INVITE           – join an existing admin channel via SecureJoin
+
+Pipe command format (newline-delimited JSON):
+    {"cmd": "send", "chat_id": <int>, "text": "<str>"}
+"""
+
+import logging
+import os
+import subprocess
+import sys
+import threading
+import time
+from argparse import ArgumentParser, Namespace
+from typing import Optional
+
+from appdirs import user_config_dir
+from deltachat2 import Bot, CoreEvent, EventType, IOTransport, JsonRpcError, Rpc
+
+APP_NAME = "dcagent"
+_JOIN_TIMEOUT = 60
+_INIT_TIMEOUT = 120
+
+log = logging.getLogger(__name__)
+
+
+class AgentError(Exception):
+    """Fatal user-facing error — logged and exits with code 1."""
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _accounts_dir(config_dir: str) -> str:
+    os.makedirs(config_dir, exist_ok=True)
+    return os.path.join(config_dir, "accounts")
+
+
+def _first_accid(rpc: Rpc, args: Namespace) -> int:
+    if args.account:
+        return args.account
+    accounts = rpc.get_all_account_ids()
+    if not accounts:
+        raise AgentError("No accounts configured. Run 'init' first.")
+    return accounts[0]
+
+
+def _ensure_configured(rpc: Rpc, accid: int) -> None:
+    if not rpc.is_configured(accid):
+        raise AgentError("Account not configured. Run 'init' first.")
+
+
+def get_addrs(rpc: Rpc, accid: int) -> list:
+    return [p["addr"] for p in rpc.list_transports(accid)]
+
+
+def _get_or_create_admin_chat(rpc: Rpc, accid: int) -> int:
+    chatid = int(rpc.get_config(accid, "ui.admin_chat") or 0)
+    if not chatid:
+        chatid = rpc.create_group_chat(accid, "Bot Admins", True)
+        rpc.set_config(accid, "ui.admin_chat", str(chatid))
+    return chatid
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle commands
+# ---------------------------------------------------------------------------
+
+
+def do_init(rpc: Rpc, args: Namespace) -> None:
+    """Configure a new or existing account."""
+    accid = args.account or rpc.add_account()
+    rpc.set_config(accid, "bot", "1")
+    log.info("Configuring account #%d ...", accid)
+
+    done = threading.Event()
+    failed: list[str] = []
+
+    def _watch_configure() -> None:
+        while True:
+            raw = rpc.get_next_event()
+            ev = CoreEvent(raw.event)
+            if ev.kind == EventType.CONFIGURE_PROGRESS:
+                if ev.comment:
+                    log.debug("%s", ev.comment)
+                if ev.progress == 1000:
+                    done.set()
+                    break
+                if ev.progress == 0:
+                    failed.append(ev.comment or "Configuration failed")
+                    done.set()
+                    break
+
+    t = threading.Thread(target=_watch_configure, daemon=True)
+    t.start()
+
+    try:
+        if not args.password:
+            rpc.add_transport_from_qr(accid, args.addr)
+        else:
+            rpc.add_or_update_transport(accid, {"addr": args.addr, "password": args.password})
+    except JsonRpcError as exc:
+        raise AgentError(f"Configuration error: {exc}") from exc
+
+    t.join(timeout=_INIT_TIMEOUT)
+    if t.is_alive():
+        raise AgentError(f"Configuration timed out after {_INIT_TIMEOUT}s")
+
+    if failed:
+        raise AgentError(failed[0])
+
+    addrs = get_addrs(rpc, accid)
+    log.info("Account #%d configured: %s", accid, ", ".join(addrs))
+
+
+def do_config(rpc: Rpc, args: Namespace) -> None:
+    """Get or set account configuration values."""
+    accid = _first_accid(rpc, args)
+    if args.value is not None:
+        rpc.set_config(accid, args.key, args.value)
+    if args.key:
+        try:
+            value = rpc.get_config(accid, args.key)
+            print(f"{args.key}={value!r}")
+        except JsonRpcError as exc:
+            raise AgentError(f"Unknown configuration key: {args.key}") from exc
+    else:
+        keys = rpc.get_config(accid, "sys.config_keys") or ""
+        for key in keys.split():
+            print(f"{key}={rpc.get_config(accid, key)!r}")
+
+
+def do_link(rpc: Rpc, args: Namespace) -> None:
+    """Print the personal invite link for this account."""
+    accid = _first_accid(rpc, args)
+    _ensure_configured(rpc, accid)
+    print(rpc.get_chat_securejoin_qr_code(accid, None))
+
+
+def do_admin(rpc: Rpc, args: Namespace) -> None:
+    """Print the admin-group invite link (keep secret — anyone who joins becomes admin)."""
+    accid = _first_accid(rpc, args)
+    _ensure_configured(rpc, accid)
+    chatid = _get_or_create_admin_chat(rpc, accid)
+    print(rpc.get_chat_securejoin_qr_code(accid, chatid))
+
+
+def do_join(rpc: Rpc, args: Namespace) -> None:
+    """Join an existing admin channel via a SecureJoin invite link."""
+    accid = _first_accid(rpc, args)
+    _ensure_configured(rpc, accid)
+
+    rpc.start_io(accid)
+    chat_id = rpc.secure_join(accid, args.invite)
+    log.info("SecureJoin initiated (chat_id=%s), waiting for handshake…", chat_id)
+
+    deadline = time.monotonic() + _JOIN_TIMEOUT
+    while time.monotonic() < deadline:
+        raw = rpc.get_next_event()
+        ev = CoreEvent(raw.event)
+        if ev.kind == EventType.SECUREJOIN_JOINER_PROGRESS:
+            log.debug("SecureJoin progress: %d%%", ev.progress // 10)
+            if ev.progress == 1000:
+                break
+            if ev.progress == 0:
+                raise AgentError("SecureJoin failed or was cancelled")
+    else:
+        raise AgentError(f"SecureJoin timed out after {_JOIN_TIMEOUT}s")
+
+    rpc.set_config(accid, "ui.admin_chat", str(chat_id))
+    log.info("Joined admin channel (chat_id=%s)", chat_id)
+    print(chat_id)
+
+
+def do_serve(rpc: Rpc, args: Namespace) -> None:
+    """Start the bot event loop."""
+    accid = _first_accid(rpc, args)
+    _ensure_configured(rpc, accid)
+    run_bot(rpc, accid, pipe_path=getattr(args, "pipe", None))
+
+
+# ---------------------------------------------------------------------------
+# run_bot — default implementation (no handlers, no pipe).
+# Override by assigning dcagent.bot.run_bot = your_function before main().
+# agent.py does this automatically when imported.
+# ---------------------------------------------------------------------------
+
+
+def run_bot(rpc: Rpc, accid: int, pipe_path: Optional[str] = None) -> None:
+    """Minimal bot: bare event loop with no message handlers."""
+    addrs = get_addrs(rpc, accid)
+    log.info("Listening at: %s", ", ".join(addrs))
+    bot = Bot(rpc, [], logger=log)
+    while True:
+        try:
+            bot.run_forever(accid)
+        except KeyboardInterrupt:
+            return
+        except Exception as exc:
+            log.exception("Event loop error: %s", exc)
+            time.sleep(5)
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+
+def _build_parser() -> ArgumentParser:
+    parser = ArgumentParser(
+        APP_NAME,
+        description=__doc__,
+        formatter_class=lambda prog: __import__("argparse").RawDescriptionHelpFormatter(prog),
+    )
+
+    parser.add_argument(
+        "--config-dir",
+        "-c",
+        metavar="PATH",
+        default=user_config_dir(APP_NAME),
+        help="configuration folder (default: %(default)s)",
+    )
+    parser.add_argument("--account", "-a", metavar="ID", type=int, help="account ID to operate on")
+    parser.add_argument(
+        "--logging",
+        "-l",
+        metavar="LEVEL",
+        default="info",
+        choices=["debug", "info", "warning", "error"],
+        help="log level (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--log-file",
+        metavar="PATH",
+        help="also write logs to this file",
+    )
+
+    sub = parser.add_subparsers(title="subcommands", dest="subcommand")
+
+    p = sub.add_parser("init", help="configure a new account")
+    p.add_argument("addr", help="email address or DCACCOUNT URI (e.g. DCACCOUNT:https://nine.testrun.org/new)")
+    p.add_argument("password", nargs="?", help="password (not needed for DCACCOUNT URIs)")
+
+    p = sub.add_parser("config", help="get or set account configuration")
+    p.add_argument("key", nargs="?", help="config key")
+    p.add_argument("value", nargs="?", help="value to set")
+
+    sub.add_parser("link", help="print personal invite link")
+    sub.add_parser("admin", help="print admin-group invite link")
+
+    p = sub.add_parser("serve", help="run the bot")
+    p.add_argument("--pipe", metavar="PATH", help="path to Unix named pipe for external commands")
+
+    p = sub.add_parser("join", help="join an admin channel via SecureJoin")
+    p.add_argument("invite", metavar="INVITE", help="SecureJoin invite link")
+
+    return parser
+
+
+def main(argv: Optional[list] = None) -> None:
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+
+    logging.basicConfig(
+        level=getattr(logging, args.logging.upper()),
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    if args.log_file:
+        fh = logging.FileHandler(args.log_file)
+        fh.setLevel(getattr(logging, args.logging.upper()))
+        fh.setFormatter(
+            logging.Formatter(
+                "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
+        )
+        logging.getLogger().addHandler(fh)
+
+    if not args.subcommand:
+        parser.print_help()
+        sys.exit(1)
+
+    accounts_dir = _accounts_dir(args.config_dir)
+    kwargs = {} if args.logging == "debug" else {"stderr": subprocess.DEVNULL}
+
+    try:
+        with IOTransport(accounts_dir=accounts_dir, **kwargs) as trans:
+            rpc = Rpc(trans)
+            log.debug("deltachat core %s", rpc.get_system_info().deltachat_core_version)
+            dispatch = {
+                "init": do_init,
+                "config": do_config,
+                "link": do_link,
+                "admin": do_admin,
+                "serve": do_serve,
+                "join": do_join,
+            }
+            dispatch[args.subcommand](rpc, args)
+    except AgentError as exc:
+        log.error("%s", exc)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
