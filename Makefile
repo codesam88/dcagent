@@ -47,5 +47,5 @@ tags:
 clean:
 	rm -rf .ruff_cache/
 	rm -rf .pytest_cache/
-	rm -rf __pycache__/
+	rm -rf src/dcagent/__pycache__/
 	find . -name "*.pyc" -delete 2>/dev/null || true
