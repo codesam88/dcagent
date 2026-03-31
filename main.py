@@ -1,39 +1,22 @@
 """
 Delta Chat Agent (dcagent)
 --------------------------
-An echo bot that also accepts commands from an external Unix named pipe,
-allowing other processes to trigger outbound messages and commands.
 
-Usage
------
-# One-time setup: create a random chatmail account and set name/status
-uv run dcagent init DCACCOUNT:https://nine.testrun.org/new
-uv run dcagent config displayname "My Agent"
-uv run dcagent config selfstatus "I am an agent."
-
-# Get the invite link for connecting (control channel)
-uv run dcagent link
-
-# Start the bot (pipe is created automatically at runtime)
-uv run dcagent serve
-
-Pipe command format (one JSON object per line)
-----------------------------------------------
-{"cmd": "send", "chat_id": 12, "text": "Hello from outside!"}
-
-Example
--------
-echo '{"cmd": "send", "chat_id": 12, "text": "alert!"}' > /tmp/dcagent.pipe
+Leverage BotCli for a simple DeltaChat chat bot.
+Add a thread for listening to messages on unix pipe.
+Add join commands to join existing chats (and for easy E2E testing)
 """
 
 import json
 import logging
 import os
 import stat
+import sys
 import threading
+import time
 
 from deltabot_cli import BotCli
-from deltachat2 import MsgData, events
+from deltachat2 import CoreEvent, EventType, MsgData, events
 
 logger = logging.getLogger(__name__)
 
@@ -168,6 +151,49 @@ def on_ping(bot, accid: int, event) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Join subcommand
+# ---------------------------------------------------------------------------
+
+_JOIN_TIMEOUT = 60  # seconds to wait for SecureJoin handshake
+
+
+def _join_cmd(_cli, bot, args) -> None:
+    """Join an existing admin channel via a SecureJoin invite link.
+
+    The resulting chat is saved as this bot's admin channel, replacing any
+    previously configured admin chat. Prints the chat_id on success.
+    """
+    accid = args.account or bot.rpc.get_all_account_ids()[0]
+    if not bot.rpc.is_configured(accid):
+        logger.error("Account not configured")
+        sys.exit(1)
+
+    bot.rpc.start_io(accid)
+    chat_id = bot.rpc.join_securejoin(accid, args.invite)
+    logger.info("SecureJoin initiated (chat_id=%s), waiting for handshake…", chat_id)
+
+    deadline = time.monotonic() + _JOIN_TIMEOUT
+    while time.monotonic() < deadline:
+        raw = bot.rpc.get_next_event()
+        event = CoreEvent(raw.event)
+        if event.kind == EventType.SECUREJOIN_JOINER_PROGRESS:
+            logger.debug("SecureJoin progress: %s%%", event.progress // 10)
+            if event.progress == 1000:
+                break
+            if event.progress == 0:
+                logger.error("SecureJoin failed or was cancelled")
+                sys.exit(1)
+    else:
+        logger.error("SecureJoin timed out after %ss", _JOIN_TIMEOUT)
+        sys.exit(1)
+
+    # ui.admin_chat is how BotCli identifies the admin chat and admins
+    bot.rpc.set_config(accid, "ui.admin_chat", str(chat_id))
+    logger.info("Joined admin channel (chat_id=%s)", chat_id)
+    print(chat_id)
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -183,6 +209,13 @@ def main() -> None:
         "--pipe",
         metavar="PATH",
         help="path to the Unix named pipe for external commands (default: %(default)s)",
+    )
+
+    join_parser = cli.add_subcommand(_join_cmd, name="join")
+    join_parser.add_argument(
+        "invite",
+        metavar="INVITE",
+        help="SecureJoin invite link (from 'dcagent admin' or 'dcagent link')",
     )
 
     cli.start()
