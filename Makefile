@@ -26,7 +26,7 @@ test:
 
 # Run integration tests against a live chatmail server (runs unit tests first)
 test-online:
-	run-parts tests/
+	run-parts tests/integration
 
 # Run all tests
 test-all: test test-online
@@ -49,3 +49,4 @@ clean:
 	rm -rf .pytest_cache/
 	rm -rf src/dcagent/__pycache__/
 	find . -name "*.pyc" -delete 2>/dev/null || true
+	rm -rf tests/integration/out/

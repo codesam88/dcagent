@@ -71,11 +71,25 @@ def get_addrs(rpc: Rpc, accid: int) -> list:
 
 
 def _get_or_create_admin_chat(rpc: Rpc, accid: int) -> int:
-    chatid = int(rpc.get_config(accid, "ui.admin_chat") or 0)
-    if not chatid:
-        chatid = rpc.create_group_chat(accid, "Bot Admins", True)
-        rpc.set_config(accid, "ui.admin_chat", str(chatid))
+    """Return the first admin chat, creating a new group if none exist."""
+    chats = _get_admin_chats(rpc, accid)
+    if chats:
+        return chats[0]
+    chatid = rpc.create_group_chat(accid, "Bot Admins", True)
+    _add_admin_chat(rpc, accid, chatid)
     return chatid
+
+
+def _get_admin_chats(rpc: Rpc, accid: int) -> list[int]:
+    raw = rpc.get_config(accid, "ui.admin_chats") or ""
+    return [int(x) for x in raw.split(",") if x.strip()]
+
+
+def _add_admin_chat(rpc: Rpc, accid: int, chat_id: int) -> None:
+    chats = _get_admin_chats(rpc, accid)
+    if chat_id not in chats:
+        chats.append(chat_id)
+    rpc.set_config(accid, "ui.admin_chats", ",".join(str(c) for c in chats))
 
 
 def _get_alert_chats(rpc: Rpc, accid: int) -> list[int]:
@@ -88,6 +102,16 @@ def _add_alert_chat(rpc: Rpc, accid: int, chat_id: int) -> None:
     if chat_id not in chats:
         chats.append(chat_id)
     rpc.set_config(accid, "ui.alert_chats", ",".join(str(c) for c in chats))
+
+
+def _get_or_create_alert_chat(rpc: Rpc, accid: int) -> int:
+    """Return the first alert chat, creating a new group if none exist."""
+    chats = _get_alert_chats(rpc, accid)
+    if chats:
+        return chats[0]
+    chatid = rpc.create_group_chat(accid, "Bot Alerts", True)
+    _add_alert_chat(rpc, accid, chatid)
+    return chatid
 
 
 def _securejoin(rpc: Rpc, accid: int, invite: str) -> int:
@@ -178,10 +202,11 @@ def do_config(rpc: Rpc, args: Namespace) -> None:
 
 
 def do_alert(rpc: Rpc, args: Namespace) -> None:
-    """Print the personal invite link, or join a chat and add it to the alert group.
+    """Print the alert-group invite link, or join a chat and add it to the alert group.
 
-    Without an invite argument: prints the personal SecureJoin invite link for
-    this account, which others can use to start a 1:1 chat.
+    Without an invite argument: prints the SecureJoin invite link for this bot's
+    alert group, creating the group first if it doesn't exist. Anyone who joins
+    will receive pipe messages.
 
     With an invite argument: joins the chat via SecureJoin and registers it in
     the alert group (ui.alert_chats). The pipe listener will send messages to
@@ -191,7 +216,8 @@ def do_alert(rpc: Rpc, args: Namespace) -> None:
     _ensure_configured(rpc, accid)
 
     if not args.invite:
-        print(rpc.get_chat_securejoin_qr_code(accid, None))
+        chatid = _get_or_create_alert_chat(rpc, accid)
+        print(rpc.get_chat_securejoin_qr_code(accid, chatid))
         return
 
     chat_id = _securejoin(rpc, accid, args.invite)
@@ -217,7 +243,7 @@ def do_admin(rpc: Rpc, args: Namespace) -> None:
         return
 
     chat_id = _securejoin(rpc, accid, args.invite)
-    rpc.set_config(accid, "ui.admin_chat", str(chat_id))
+    _add_admin_chat(rpc, accid, chat_id)
     log.info("Joined admin channel (chat_id=%s)", chat_id)
 
 

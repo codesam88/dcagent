@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+#
+# Test that AGENT can join OWNER's alert chat via SecureJoin.
+# Requires accounts to be provisioned (00_provision).
+
+set -euo pipefail
+source "$(dirname "$0")/helpers.sh"
+trap cleanup EXIT
+
+echo "==> Getting OWNER alert invite ..."
+INVITE=$($OWNER alert 2>/dev/null | grep '^https://' | head -1)
+echo "    invite=$INVITE"
+
+echo "==> Starting OWNER serve ..."
+> "$OWNER_LOG"
+$OWNER --logging debug serve >> "$OWNER_LOG" 2>&1 &
+OWNER_PID=$!
+wait_for_log "$OWNER_LOG" "Listening at" "$TIMEOUT"
+
+echo "==> AGENT joining alert chat ..."
+$AGENT alert "$INVITE" 2>/dev/null
+
+echo "PASS [$0]"

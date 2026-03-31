@@ -54,31 +54,41 @@ uv run dcagent config selfavatar ./avatar.png
 
 ### 4. Set up alert recipients
 
-Print the agent's invite link for receiving alerts:
+The `alert` command manages the bot's alert group — a group chat that receives
+all pipe notifications. Without an invite, it prints an invite link to that group:
 
 ```bash
 uv run dcagent alert
 ```
 
-Open the printed URL in your Delta Chat app (or scan the QR code in a browser)
-to start a chat with the agent. Alternatively, let the agent join an existing
-chat by passing an invite link:
+Share the printed link with anyone who should receive alerts. When they scan it,
+they join the bot's alert group chat. Alternatively, have the bot join a chat
+defined by the user by passing their invite link:
 
 ```bash
 uv run dcagent alert <invite-link>
 ```
 
-All chats added this way receive messages sent via the pipe.
+All alert chats (whether created here or joined via invite) will receive every
+message sent through the pipe.
 
 ### 5. Setup Admin Channel (optional)
 
-Create an invite to the admin channel or join an existing one via invite.
-Contacts on the admin channel are considered admins.
+The `admin` command manages admin group chats. Without an invite, it prints an
+invite link to the bot's admin group:
 
 ```bash
-uv run dcagent admin          # print admin-channel invite
-uv run dcagent admin <invite> # join existing channel
+uv run dcagent admin
 ```
+
+Alternatively, have the bot join an admin channel defined by the user:
+
+```bash
+uv run dcagent admin <invite-link>
+```
+
+All accounts present in any admin chat are considered admins. Multiple admin
+chats are supported.
 
 ### 6. Start the agent
 

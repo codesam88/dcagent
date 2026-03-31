@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#
+# Test end-to-end message delivery via the named pipe.
+# Requires AGENT to have joined OWNER's alert chat (01_alert_join).
+
+set -euo pipefail
+source "$(dirname "$0")/helpers.sh"
+trap cleanup EXIT
+
+echo "==> Starting OWNER serve ..."
+> "$OWNER_LOG"
+$OWNER --logging debug serve >> "$OWNER_LOG" 2>&1 &
+OWNER_PID=$!
+wait_for_log "$OWNER_LOG" "Listening at" "$TIMEOUT"
+
+echo "==> Starting AGENT serve ..."
+> "$AGENT_LOG"
+$AGENT serve --pipe "$AGENT_PIPE" >> "$AGENT_LOG" 2>&1 &
+AGENT_PID=$!
+wait_for_log "$AGENT_LOG" "Listening at" "$TIMEOUT"
+wait_for_file "$AGENT_PIPE" 10
+
+MSG="hello from integration test $$"
+echo "==> Sending: $MSG"
+printf '%s\n' "$MSG" > "$AGENT_PIPE"
+
+echo "==> Waiting for OWNER to receive the message ..."
+if ! wait_for_log "$OWNER_LOG" "$MSG" "$TIMEOUT"; then
+    dump_logs
+    exit 1
+fi
+
+echo "PASS [$0]"
