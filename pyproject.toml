@@ -16,6 +16,7 @@ dcagent = "main:main"
 [dependency-groups]
 dev = [
     "ruff>=0.15.7",
+    "pytest>=8.0.0",
 ]
 
 [build-system]
