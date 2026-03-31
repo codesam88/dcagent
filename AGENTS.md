@@ -23,7 +23,7 @@ Review the README for general intro and usage.
 ## Testing
 
 Tests are implemented using pytest and static linter.
-Run all tests using `make test`.
+Run basic tests using `make test`. Run all tests using `make test-all`.
 
 Or run specific tests using respective commands:
 
