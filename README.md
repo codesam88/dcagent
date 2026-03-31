@@ -24,16 +24,14 @@ where accounts are free and nobody judges you for talking to bots.
 uv sync
 ```
 
-This installs `deltabot-cli`, `deltachat2`, and `deltachat-rpc-server` (the Delta Chat core binary).
-
 ### 2. Create a chatmail account for the agent
 
 ```bash
 uv run dcagent init DCACCOUNT:https://nine.testrun.org/new
 ```
 
-> **Tip:** Replace `nine.testrun.org` with any other [chatmail relay](https://chatmail.at/relays) you prefer.
-> You can also use a regular e-mail account:
+> **FYI:** Replace `nine.testrun.org` with any other
+> [chatmail relay](https://chatmail.at/relays), or even a regular email account:
 > ```bash
 > uv run dcagent init --email bot@example.com --password MyPassword
 > ```
@@ -60,9 +58,21 @@ uv run dcagent config selfavatar ./avatar.png
 uv run dcagent link
 ```
 
-Open the printed URL in your Delta Chat app (or scan the QR code in a browser) to start a chat with the agent.
+Open the printed URL in your Delta Chat app (or scan the QR code in a browser)
+to start a chat with the agent.
 
-### 5. Start the agent
+### 5. Setup Admin Channel (optional)
+
+Create invite to admin channel or join existing via invite. Contacts on admin
+channel are conidered admins. However, we don't tie any special functions to
+this as of now.
+
+```bash
+uv run dcagent admin  # print admin-channel invite, or
+uv run dcagent join <invite-link> # join existing channel
+```
+
+### 6. Start the agent
 
 ```bash
 uv run dcagent serve
@@ -70,7 +80,7 @@ uv run dcagent serve
 
 Send a message to the agent in your Delta Chat app — it will echo it right back!
 
-### 6. Send external commands
+### 7. Send external commands
 
 The agent can accept commands from a Unix named pipe. Start with the `--pipe` option:
 
