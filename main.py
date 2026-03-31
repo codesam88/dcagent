@@ -18,8 +18,6 @@ import time
 from deltabot_cli import BotCli
 from deltachat2 import CoreEvent, EventType, MsgData, events
 
-logger = logging.getLogger(__name__)
-
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -33,15 +31,31 @@ DEFAULT_BOT_NAME = "dcagent"
 cli = BotCli(DEFAULT_BOT_NAME)
 
 
+@cli.on_init
+def on_init(bot, args) -> None:
+    """Widen the RichHandler console so log lines are never wrapped in files."""
+    from rich.console import Console
+    from rich.logging import RichHandler
+
+    for handler in bot.logger.handlers:
+        if isinstance(handler, RichHandler):
+            handler.console = Console(width=10000)
+
+
 @cli.on_start
 def on_start(bot, args) -> None:
     """Launch the pipe listener thread."""
 
     if args.pipe:
         accid = bot.rpc.get_all_account_ids()[0]
-        t = threading.Thread(target=_pipe_listener, args=(args.pipe, accid), name="pipe-listener", daemon=True)
+        t = threading.Thread(
+            target=_pipe_listener,
+            args=(args.pipe, accid, bot.logger),
+            name="pipe-listener",
+            daemon=True,
+        )
         t.start()
-        logger.info("Pipe listener started on %s", args.pipe)
+        bot.logger.info("Pipe listener started on %s", args.pipe)
 
 
 # ---------------------------------------------------------------------------
@@ -49,18 +63,18 @@ def on_start(bot, args) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _ensure_pipe(path: str) -> None:
+def _ensure_pipe(path: str, log: logging.Logger) -> None:
     """Create the named pipe if it doesn't exist, remove a regular file if it does."""
     if os.path.exists(path):
         if not stat.S_ISFIFO(os.stat(path).st_mode):
-            logger.warning("%s exists but is not a FIFO — removing it", path)
+            log.warning("%s exists but is not a FIFO — removing it", path)
             os.remove(path)
             os.mkfifo(path)
     else:
         os.mkfifo(path)
 
 
-def _pipe_listener(path: str, accid: int) -> None:
+def _pipe_listener(path: str, accid: int, log: logging.Logger) -> None:
     """
     Blocking loop that reads newline-delimited JSON commands from the named pipe.
 
@@ -68,8 +82,7 @@ def _pipe_listener(path: str, accid: int) -> None:
     desired behaviour — the thread simply waits.  When the writer closes its
     end the read loop gets EOF; we reopen to wait for the next writer.
     """
-    _ensure_pipe(path)
-    logger.info("Waiting for commands on %s", path)
+    _ensure_pipe(path, log)
 
     while True:
         # Open blocks until at least one writer has the pipe open.
@@ -79,36 +92,36 @@ def _pipe_listener(path: str, accid: int) -> None:
                 if not raw:
                     continue
                 try:
-                    _dispatch(json.loads(raw), accid)
+                    _dispatch(json.loads(raw), accid, log)
                 except json.JSONDecodeError as exc:
-                    logger.error("Invalid JSON on pipe: %s — %s", raw, exc)
+                    log.error("Invalid JSON on pipe: %s — %s", raw, exc)
                 except Exception as exc:
-                    logger.exception("Error handling pipe command %r: %s", raw, exc)
+                    log.exception("Error handling pipe command %r: %s", raw, exc)
         # Writer closed — loop back and wait for the next one.
-        logger.debug("Pipe writer disconnected, waiting for next writer")
+        log.debug("Pipe writer disconnected, waiting for next writer")
 
 
-def _dispatch(cmd: dict, accid: int) -> None:
+def _dispatch(cmd: dict, accid: int, log: logging.Logger) -> None:
     """Route a parsed command dict to the appropriate handler."""
     kind = cmd.get("cmd")
     if kind == "send":
-        _cmd_send(accid, cmd)
+        _cmd_send(accid, cmd, log)
     else:
-        logger.warning("Unknown pipe command: %r", kind)
+        log.warning("Unknown pipe command: %r", kind)
 
 
-def _cmd_send(accid: int, cmd: dict) -> None:
+def _cmd_send(accid: int, cmd: dict, log: logging.Logger) -> None:
     """Handle {"cmd": "send", "chat_id": <int>, "text": "<str>"}."""
     chat_id = cmd.get("chat_id")
     text = cmd.get("text", "")
 
     if not isinstance(chat_id, int) or not text:
-        logger.error("send command missing chat_id or text: %r", cmd)
+        log.error("send command missing chat_id or text: %r", cmd)
         return
 
     # BotCli exposes no public send API, so we access rpc here via the private cli._bot
     cli._bot.rpc.send_msg(accid, chat_id, MsgData(text=text))  # noqa: SLF001
-    logger.info("Sent message to chat %s: %r", chat_id, text[:80] + "...")
+    log.info("Sent message to chat %s: %r", chat_id, text[:80] + "...")
 
 
 # ---------------------------------------------------------------------------
@@ -116,17 +129,20 @@ def _cmd_send(accid: int, cmd: dict) -> None:
 # ---------------------------------------------------------------------------
 
 
-@cli.on(events.NewMessage)
+@cli.on(events.NewMessage(is_bot=None))
 def on_new_message(bot, accid: int, event) -> None:
-    """Echo every incoming message back to the sender."""
+    """Handle incoming messages. No real action at this point, just logging."""
     msg = event.msg
 
-    # Ignore messages sent by the bot itself and empty messages
-    if not msg.text or msg.is_bot:
+    # Ignore empty messages
+    if not msg.text:
         return
 
-    bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=msg.text))
-    logger.info("Received message in chat %s: %r", msg.chat_id, msg.text[:80] + "...")
+    bot.logger.info("Received message in chat %s: %r", msg.chat_id, msg.text[:80])
+
+    # # Echo messages back to the sender
+    # if not msg.is_bot: # ignore bot messages, may cause loops
+    #     bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=msg.text))
 
 
 @cli.on(events.NewMessage(command="/help"))
@@ -165,31 +181,31 @@ def _join_cmd(_cli, bot, args) -> None:
     """
     accid = args.account or bot.rpc.get_all_account_ids()[0]
     if not bot.rpc.is_configured(accid):
-        logger.error("Account not configured")
+        bot.logger.error("Account not configured")
         sys.exit(1)
 
     bot.rpc.start_io(accid)
-    chat_id = bot.rpc.join_securejoin(accid, args.invite)
-    logger.info("SecureJoin initiated (chat_id=%s), waiting for handshake…", chat_id)
+    chat_id = bot.rpc.secure_join(accid, args.invite)
+    bot.logger.info("SecureJoin initiated (chat_id=%s), waiting for handshake…", chat_id)
 
     deadline = time.monotonic() + _JOIN_TIMEOUT
     while time.monotonic() < deadline:
         raw = bot.rpc.get_next_event()
         event = CoreEvent(raw.event)
         if event.kind == EventType.SECUREJOIN_JOINER_PROGRESS:
-            logger.debug("SecureJoin progress: %s%%", event.progress // 10)
+            bot.logger.debug("SecureJoin progress: %s%%", event.progress // 10)
             if event.progress == 1000:
                 break
             if event.progress == 0:
-                logger.error("SecureJoin failed or was cancelled")
+                bot.logger.error("SecureJoin failed or was cancelled")
                 sys.exit(1)
     else:
-        logger.error("SecureJoin timed out after %ss", _JOIN_TIMEOUT)
+        bot.logger.error("SecureJoin timed out after %ss", _JOIN_TIMEOUT)
         sys.exit(1)
 
     # ui.admin_chat is how BotCli identifies the admin chat and admins
     bot.rpc.set_config(accid, "ui.admin_chat", str(chat_id))
-    logger.info("Joined admin channel (chat_id=%s)", chat_id)
+    bot.logger.info("Joined admin channel (chat_id=%s)", chat_id)
     print(chat_id)
 
 
@@ -199,12 +215,6 @@ def _join_cmd(_cli, bot, args) -> None:
 
 
 def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
     cli.add_generic_option(
         "--pipe",
         metavar="PATH",

@@ -12,3 +12,4 @@ wheels/
 # Editor/agent state
 .claude/
 .crush/
+.tmp/
