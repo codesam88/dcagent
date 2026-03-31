@@ -1,4 +1,4 @@
-.PHONY: run test test-online test-all lint format docs clean help
+.PHONY: run test test-online test-all lint format docs tags clean help
 
 # Help
 help:
@@ -9,6 +9,7 @@ help:
 	@echo "  test-online      - Run unit tests then integration tests (requires network)"
 	@echo "  test-all         - Alias for test-online"
 	@echo "  docs             - Regenerate docs/deltachat-rpc-api.md from installed binary"
+	@echo "  tags             - Generate ctags for src/ (vim/ctags)"
 	@echo "  format           - Format code"
 	@echo "  clean            - Clean build artifacts"
 	@echo "  help             - Show this help message"
@@ -37,6 +38,10 @@ format:
 # Regenerate API reference docs
 docs:
 	uv run python scripts/gen_rpc_ref.py
+
+# Generate ctags for src/ and tests/
+tags:
+	ctags -R src/ tests/
 
 # Clean build artifacts
 clean:

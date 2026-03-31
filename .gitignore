@@ -9,6 +9,9 @@ wheels/
 # Virtual environments
 .venv
 
+# ctags
+tags
+
 # Editor/agent state
 .claude/
 .crush/
