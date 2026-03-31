@@ -17,6 +17,7 @@ dcagent = "main:main"
 dev = [
     "ruff>=0.15.7",
     "pytest>=8.0.0",
+    "pre-commit>=4.0.0",
 ]
 
 [build-system]

@@ -15,20 +15,10 @@ Review the README for general intro and usage.
 
 4. After any modification, always run tests (`make test`)
 
-5. Once tests are successful, run the code-formatter and ask the user for review.
+5. Once tests are successful, ask the user for review.
 
 6. Once the user is happy or about to commit, review the documentation for any
    necessary updates.
-
-### Make Commands Reference
-
-| Command | Purpose |
-|---------|---------|
-| `make run` | Start the agent |
-| `make test` | Run all tests (linter + pytest) |
-| `make format` | Format code with ruff |
-| `make clean` | Remove build/cache artifacts |
-| `make help` | Show all targets |
 
 ## Testing
 

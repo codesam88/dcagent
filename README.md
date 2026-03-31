@@ -101,6 +101,19 @@ dcagent/
 
 ### Useful commands
 
+The most common commands are wrapped into makefile helpers:
+
+| Command      | Purpose |
+|--------------|---------|
+| `make run`   | Start the agent |
+| `make test`  | Run all tests (linter, pytest, pre-commit) |
+| `make format`| Format code with ruff |
+| `make clean` | Remove build/cache artifacts |
+| `make help`  | Show all targets |
+
+
+You can look them up in the Makefile and call directly, e.g.:
+
 ```bash
 # Run the agent
 uv run dcagent serve
@@ -117,6 +130,7 @@ uv run ruff check
 # Format code
 uv run ruff format
 ```
+
 
 ## References
 
