@@ -1,7 +1,7 @@
 """
 dcagent bot — lifecycle commands, RPC infrastructure, and CLI entry point.
 
-Provides the do_* lifecycle commands (init, config, link, admin, serve),
+Provides the do_* lifecycle commands (init, config, alert, admin, serve),
 shared helpers, and main(). run_bot() has a minimal default implementation
 that agent.py overrides with the full handler/pipe stack.
 
@@ -11,12 +11,12 @@ Usage:
 Subcommands:
     init ADDR [PASSWORD]   – configure a new account
     config [KEY [VALUE]]   – get/set account configuration
-    link                   – print personal invite link
+    alert [INVITE]        – print personal invite link, or join a chat and add it to the alert group
     admin [INVITE]         – print admin-group invite link, or join one via SecureJoin
     serve [--pipe PATH]    – run the bot (event loop + optional pipe listener)
 
-Pipe command format (newline-delimited JSON):
-    {"cmd": "send", "chat_id": <int>, "text": "<str>"}
+Pipe input format:
+    One plain-text message per line — forwarded to all alert chats.
 """
 
 import logging
@@ -76,6 +76,37 @@ def _get_or_create_admin_chat(rpc: Rpc, accid: int) -> int:
         chatid = rpc.create_group_chat(accid, "Bot Admins", True)
         rpc.set_config(accid, "ui.admin_chat", str(chatid))
     return chatid
+
+
+def _get_alert_chats(rpc: Rpc, accid: int) -> list[int]:
+    raw = rpc.get_config(accid, "ui.alert_chats") or ""
+    return [int(x) for x in raw.split(",") if x.strip()]
+
+
+def _add_alert_chat(rpc: Rpc, accid: int, chat_id: int) -> None:
+    chats = _get_alert_chats(rpc, accid)
+    if chat_id not in chats:
+        chats.append(chat_id)
+    rpc.set_config(accid, "ui.alert_chats", ",".join(str(c) for c in chats))
+
+
+def _securejoin(rpc: Rpc, accid: int, invite: str) -> int:
+    """Perform a SecureJoin handshake and return the resulting chat ID."""
+    rpc.start_io(accid)
+    chat_id = rpc.secure_join(accid, invite)
+    log.info("SecureJoin initiated (chat_id=%s), waiting for handshake…", chat_id)
+
+    deadline = time.monotonic() + _JOIN_TIMEOUT
+    while time.monotonic() < deadline:
+        raw = rpc.get_next_event()
+        ev = CoreEvent(raw.event)
+        if ev.kind == EventType.SECUREJOIN_JOINER_PROGRESS:
+            log.debug("SecureJoin progress: %d%%", ev.progress // 10)
+            if ev.progress == 1000:
+                return chat_id
+            if ev.progress == 0:
+                raise AgentError("SecureJoin failed or was cancelled")
+    raise AgentError(f"SecureJoin timed out after {_JOIN_TIMEOUT}s")
 
 
 # ---------------------------------------------------------------------------
@@ -146,11 +177,26 @@ def do_config(rpc: Rpc, args: Namespace) -> None:
             print(f"{key}={rpc.get_config(accid, key)!r}")
 
 
-def do_link(rpc: Rpc, args: Namespace) -> None:
-    """Print the personal invite link for this account."""
+def do_alert(rpc: Rpc, args: Namespace) -> None:
+    """Print the personal invite link, or join a chat and add it to the alert group.
+
+    Without an invite argument: prints the personal SecureJoin invite link for
+    this account, which others can use to start a 1:1 chat.
+
+    With an invite argument: joins the chat via SecureJoin and registers it in
+    the alert group (ui.alert_chats). The pipe listener will send messages to
+    all chats in this group.
+    """
     accid = _first_accid(rpc, args)
     _ensure_configured(rpc, accid)
-    print(rpc.get_chat_securejoin_qr_code(accid, None))
+
+    if not args.invite:
+        print(rpc.get_chat_securejoin_qr_code(accid, None))
+        return
+
+    chat_id = _securejoin(rpc, accid, args.invite)
+    _add_alert_chat(rpc, accid, chat_id)
+    log.info("Joined alert chat (chat_id=%s)", chat_id)
 
 
 def do_admin(rpc: Rpc, args: Namespace) -> None:
@@ -170,26 +216,9 @@ def do_admin(rpc: Rpc, args: Namespace) -> None:
         print(rpc.get_chat_securejoin_qr_code(accid, chatid))
         return
 
-    rpc.start_io(accid)
-    chat_id = rpc.secure_join(accid, args.invite)
-    log.info("SecureJoin initiated (chat_id=%s), waiting for handshake…", chat_id)
-
-    deadline = time.monotonic() + _JOIN_TIMEOUT
-    while time.monotonic() < deadline:
-        raw = rpc.get_next_event()
-        ev = CoreEvent(raw.event)
-        if ev.kind == EventType.SECUREJOIN_JOINER_PROGRESS:
-            log.debug("SecureJoin progress: %d%%", ev.progress // 10)
-            if ev.progress == 1000:
-                break
-            if ev.progress == 0:
-                raise AgentError("SecureJoin failed or was cancelled")
-    else:
-        raise AgentError(f"SecureJoin timed out after {_JOIN_TIMEOUT}s")
-
+    chat_id = _securejoin(rpc, accid, args.invite)
     rpc.set_config(accid, "ui.admin_chat", str(chat_id))
     log.info("Joined admin channel (chat_id=%s)", chat_id)
-    print(chat_id)
 
 
 def do_serve(rpc: Rpc, args: Namespace) -> None:
@@ -265,7 +294,8 @@ def _build_parser() -> ArgumentParser:
     p.add_argument("key", nargs="?", help="config key")
     p.add_argument("value", nargs="?", help="value to set")
 
-    sub.add_parser("link", help="print personal invite link")
+    p = sub.add_parser("alert", help="print personal invite link, or join a chat and add it to the alert group")
+    p.add_argument("invite", nargs="?", metavar="INVITE", help="if given, join this chat via SecureJoin")
 
     p = sub.add_parser("admin", help="print admin-group invite link, or join one via SecureJoin")
     p.add_argument("invite", nargs="?", metavar="INVITE", help="if given, join this admin channel via SecureJoin")
@@ -311,7 +341,7 @@ def main(argv: Optional[list] = None) -> None:
             dispatch = {
                 "init": do_init,
                 "config": do_config,
-                "link": do_link,
+                "alert": do_alert,
                 "admin": do_admin,
                 "serve": do_serve,
             }

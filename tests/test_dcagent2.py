@@ -5,8 +5,16 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from dcagent.agent import _dispatch, _pipe_send
-from dcagent.bot import APP_NAME, AgentError, _build_parser, _ensure_configured, _get_or_create_admin_chat
+from dcagent.agent import _pipe_forward
+from dcagent.bot import (
+    APP_NAME,
+    AgentError,
+    _add_alert_chat,
+    _build_parser,
+    _ensure_configured,
+    _get_alert_chats,
+    _get_or_create_admin_chat,
+)
 
 # ---------------------------------------------------------------------------
 # Parser
@@ -47,6 +55,18 @@ def test_parser_config_set():
     assert args.value == "MyBot"
 
 
+def test_parser_alert_no_invite():
+    args = _build_parser().parse_args(["alert"])
+    assert args.subcommand == "alert"
+    assert args.invite is None
+
+
+def test_parser_alert_with_invite():
+    args = _build_parser().parse_args(["alert", "https://i.delta.chat/#ABC"])
+    assert args.subcommand == "alert"
+    assert args.invite == "https://i.delta.chat/#ABC"
+
+
 def test_parser_admin_no_invite():
     args = _build_parser().parse_args(["admin"])
     assert args.subcommand == "admin"
@@ -75,13 +95,14 @@ def test_parser_log_file_default():
 
 
 # ---------------------------------------------------------------------------
-# _dispatch / _pipe_send
+# _pipe_forward
 # ---------------------------------------------------------------------------
 
 
-def test_dispatch_send():
+def test_pipe_forward_sends_to_alert_chats():
     rpc = MagicMock()
-    _dispatch({"cmd": "send", "chat_id": 42, "text": "hello"}, accid=1, rpc=rpc)
+    rpc.get_config.return_value = "42"
+    _pipe_forward("hello", accid=1, rpc=rpc)
     rpc.send_msg.assert_called_once()
     call_args = rpc.send_msg.call_args
     assert call_args[0][0] == 1  # accid
@@ -89,28 +110,57 @@ def test_dispatch_send():
     assert call_args[0][2].text == "hello"
 
 
-def test_dispatch_unknown_command(caplog):
+def test_pipe_forward_no_alert_chats(caplog):
     rpc = MagicMock()
+    rpc.get_config.return_value = None
     with caplog.at_level(logging.WARNING, logger=APP_NAME):
-        _dispatch({"cmd": "bogus"}, accid=1, rpc=rpc)
-    assert "bogus" in caplog.text
+        _pipe_forward("hi", accid=1, rpc=rpc)
+    assert "no alert chats" in caplog.text
     rpc.send_msg.assert_not_called()
 
 
-def test_pipe_send_missing_chat_id(caplog):
+def test_pipe_forward_multiple_chats():
     rpc = MagicMock()
-    with caplog.at_level(logging.ERROR, logger=APP_NAME):
-        _pipe_send(1, {"cmd": "send", "text": "hi"}, rpc)
-    assert "missing" in caplog.text
-    rpc.send_msg.assert_not_called()
+    rpc.get_config.return_value = "5,7,9"
+    _pipe_forward("hi", accid=1, rpc=rpc)
+    assert rpc.send_msg.call_count == 3
 
 
-def test_pipe_send_missing_text(caplog):
+# ---------------------------------------------------------------------------
+# _get_alert_chats / _add_alert_chat
+# ---------------------------------------------------------------------------
+
+
+def test_get_alert_chats_empty():
     rpc = MagicMock()
-    with caplog.at_level(logging.ERROR, logger=APP_NAME):
-        _pipe_send(1, {"cmd": "send", "chat_id": 5}, rpc)
-    assert "missing" in caplog.text
-    rpc.send_msg.assert_not_called()
+    rpc.get_config.return_value = None
+    assert _get_alert_chats(rpc, accid=1) == []
+
+
+def test_get_alert_chats_single():
+    rpc = MagicMock()
+    rpc.get_config.return_value = "42"
+    assert _get_alert_chats(rpc, accid=1) == [42]
+
+
+def test_get_alert_chats_multiple():
+    rpc = MagicMock()
+    rpc.get_config.return_value = "5,7,9"
+    assert _get_alert_chats(rpc, accid=1) == [5, 7, 9]
+
+
+def test_add_alert_chat_new():
+    rpc = MagicMock()
+    rpc.get_config.return_value = "5"
+    _add_alert_chat(rpc, accid=1, chat_id=7)
+    rpc.set_config.assert_called_once_with(1, "ui.alert_chats", "5,7")
+
+
+def test_add_alert_chat_no_duplicate():
+    rpc = MagicMock()
+    rpc.get_config.return_value = "5,7"
+    _add_alert_chat(rpc, accid=1, chat_id=7)
+    rpc.set_config.assert_called_once_with(1, "ui.alert_chats", "5,7")
 
 
 # ---------------------------------------------------------------------------

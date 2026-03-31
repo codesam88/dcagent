@@ -1,0 +1,1 @@
+the CHAT_ID regex in the e2e test script is now obsolete, we don't need to know the chatid. also means we don't need to override the rich logger line width

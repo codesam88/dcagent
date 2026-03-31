@@ -90,8 +90,8 @@ $AGENT init "DCACCOUNT:$CHATMAIL"
 $AGENT config displayname "agent"
 
 # Fetch invite before starting serve — can't open the same accounts dir twice.
-echo "==> Getting OWNER admin invite ..."
-INVITE=$($OWNER admin 2>/dev/null | grep '^https://' | head -1)
+echo "==> Getting OWNER alert invite ..."
+INVITE=$($OWNER alert 2>/dev/null | grep '^https://' | head -1)
 echo "    invite=${INVITE}"
 
 # ── Start OWNER serve ─────────────────────────────────────────────────────────
@@ -101,12 +101,10 @@ $OWNER --logging debug serve >"$OWNER_LOG" 2>&1 &
 OWNER_PID=$!
 wait_for_log "$OWNER_LOG" "Listening at" "$TIMEOUT"
 
-# ── AGENT joins admin channel ─────────────────────────────────────────────────
+# ── AGENT joins alert chat ────────────────────────────────────────────────────
 
-echo "==> AGENT joining admin channel ..."
-CHAT_ID=$($AGENT admin "$INVITE" 2>/dev/null)
-[[ "$CHAT_ID" =~ ^[0-9]+$ ]] || { echo "ERROR: could not parse chat_id from join output: '$CHAT_ID'" >&2; exit 1; }
-echo "    chat_id=$CHAT_ID"
+echo "==> AGENT joining alert chat ..."
+$AGENT alert "$INVITE" 2>/dev/null
 
 # ── Start AGENT serve ─────────────────────────────────────────────────────────
 
@@ -120,7 +118,7 @@ wait_for_file "$AGENT_PIPE" 10
 
 MSG="hello from integration test $$"
 echo "==> Sending: $MSG"
-printf '{"cmd":"send","chat_id":%s,"text":"%s"}\n' "$CHAT_ID" "$MSG" > "$AGENT_PIPE"
+printf '%s\n' "$MSG" > "$AGENT_PIPE"
 
 echo "==> Waiting for OWNER to log the received message ..."
 if ! wait_for_log "$OWNER_LOG" "$MSG" "$TIMEOUT"; then
