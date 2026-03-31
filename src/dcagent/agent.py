@@ -8,7 +8,6 @@ patch then delegates to bot.main().
 To use dcagent without the agent layer (bare event loop), run bot.main() directly.
 """
 
-import json
 import logging
 import os
 import stat
@@ -39,43 +38,33 @@ def _ensure_pipe(path: str) -> None:
         os.mkfifo(path)
 
 
+def _pipe_forward(text: str, accid: int, rpc: Rpc) -> None:
+    """Forward a single text message to all alert chats."""
+    chat_ids = _bot._get_alert_chats(rpc, accid)
+    if not chat_ids:
+        log.warning("pipe message received but no alert chats configured")
+        return
+    for chat_id in chat_ids:
+        rpc.send_msg(accid, chat_id, MsgData(text=text))
+        log.info("Sent message to chat %s: %r", chat_id, text[:80])
+
+
 def _pipe_listener(path: str, accid: int, rpc: Rpc) -> None:
-    """Blocking loop that reads newline-delimited JSON commands from the named pipe."""
+    """Blocking loop that reads plain-text lines from the named pipe and forwards each to all alert chats."""
     _ensure_pipe(path)
-    log.info("Waiting for commands on %s", path)
+    log.info("Waiting for messages on %s", path)
 
     while True:
         with open(path) as pipe:
-            for raw in pipe:
-                raw = raw.strip()
-                if not raw:
+            for line in pipe:
+                line = line.strip()
+                if not line:
                     continue
                 try:
-                    _dispatch(json.loads(raw), accid, rpc)
-                except json.JSONDecodeError as exc:
-                    log.error("Invalid JSON on pipe: %s — %s", raw, exc)
+                    _pipe_forward(line, accid, rpc)
                 except Exception as exc:
-                    log.exception("Error handling pipe command %r: %s", raw, exc)
+                    log.exception("Error forwarding pipe message %r: %s", line, exc)
         log.debug("Pipe writer disconnected, waiting for next writer")
-
-
-def _dispatch(cmd: dict, accid: int, rpc: Rpc) -> None:
-    kind = cmd.get("cmd")
-    if kind == "send":
-        _pipe_send(accid, cmd, rpc)
-    else:
-        log.warning("Unknown pipe command: %r", kind)
-
-
-def _pipe_send(accid: int, cmd: dict, rpc: Rpc) -> None:
-    """Handle {"cmd": "send", "chat_id": <int>, "text": "<str>"}."""
-    chat_id = cmd.get("chat_id")
-    text = cmd.get("text", "")
-    if not isinstance(chat_id, int) or not text:
-        log.error("send command missing chat_id or text: %r", cmd)
-        return
-    rpc.send_msg(accid, chat_id, MsgData(text=text))
-    log.info("Sent message to chat %s: %r", chat_id, text[:80])
 
 
 # ---------------------------------------------------------------------------
