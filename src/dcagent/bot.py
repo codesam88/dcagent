@@ -1,7 +1,7 @@
 """
 dcagent bot — lifecycle commands, RPC infrastructure, and CLI entry point.
 
-Provides the do_* lifecycle commands (init, config, link, admin, join, serve),
+Provides the do_* lifecycle commands (init, config, link, admin, serve),
 shared helpers, and main(). run_bot() has a minimal default implementation
 that agent.py overrides with the full handler/pipe stack.
 
@@ -9,12 +9,11 @@ Usage:
     dcagent [--config-dir PATH] [--logging LEVEL] [--log-file PATH] <subcommand> [args]
 
 Subcommands:
-    init ADDR [PASSWORD]  – configure a new account
-    config [KEY [VALUE]]  – get/set account configuration
-    link                  – print personal invite link
-    admin                 – print admin-group invite link
-    serve [--pipe PATH]   – run the bot (event loop + optional pipe listener)
-    join INVITE           – join an existing admin channel via SecureJoin
+    init ADDR [PASSWORD]   – configure a new account
+    config [KEY [VALUE]]   – get/set account configuration
+    link                   – print personal invite link
+    admin [INVITE]         – print admin-group invite link, or join one via SecureJoin
+    serve [--pipe PATH]    – run the bot (event loop + optional pipe listener)
 
 Pipe command format (newline-delimited JSON):
     {"cmd": "send", "chat_id": <int>, "text": "<str>"}
@@ -155,17 +154,21 @@ def do_link(rpc: Rpc, args: Namespace) -> None:
 
 
 def do_admin(rpc: Rpc, args: Namespace) -> None:
-    """Print the admin-group invite link (keep secret — anyone who joins becomes admin)."""
+    """Print the admin-group invite link, or join an existing one via SecureJoin.
+
+    Without an invite argument: prints the invite link for this bot's admin group
+    (keep secret — anyone who joins becomes admin).
+
+    With an invite argument: joins the admin channel identified by the SecureJoin
+    invite link and stores it as this bot's admin chat.
+    """
     accid = _first_accid(rpc, args)
     _ensure_configured(rpc, accid)
-    chatid = _get_or_create_admin_chat(rpc, accid)
-    print(rpc.get_chat_securejoin_qr_code(accid, chatid))
 
-
-def do_join(rpc: Rpc, args: Namespace) -> None:
-    """Join an existing admin channel via a SecureJoin invite link."""
-    accid = _first_accid(rpc, args)
-    _ensure_configured(rpc, accid)
+    if not args.invite:
+        chatid = _get_or_create_admin_chat(rpc, accid)
+        print(rpc.get_chat_securejoin_qr_code(accid, chatid))
+        return
 
     rpc.start_io(accid)
     chat_id = rpc.secure_join(accid, args.invite)
@@ -263,13 +266,12 @@ def _build_parser() -> ArgumentParser:
     p.add_argument("value", nargs="?", help="value to set")
 
     sub.add_parser("link", help="print personal invite link")
-    sub.add_parser("admin", help="print admin-group invite link")
+
+    p = sub.add_parser("admin", help="print admin-group invite link, or join one via SecureJoin")
+    p.add_argument("invite", nargs="?", metavar="INVITE", help="if given, join this admin channel via SecureJoin")
 
     p = sub.add_parser("serve", help="run the bot")
     p.add_argument("--pipe", metavar="PATH", help="path to Unix named pipe for external commands")
-
-    p = sub.add_parser("join", help="join an admin channel via SecureJoin")
-    p.add_argument("invite", metavar="INVITE", help="SecureJoin invite link")
 
     return parser
 
@@ -312,7 +314,6 @@ def main(argv: Optional[list] = None) -> None:
                 "link": do_link,
                 "admin": do_admin,
                 "serve": do_serve,
-                "join": do_join,
             }
             dispatch[args.subcommand](rpc, args)
     except AgentError as exc:

@@ -47,8 +47,15 @@ def test_parser_config_set():
     assert args.value == "MyBot"
 
 
-def test_parser_join():
-    args = _build_parser().parse_args(["join", "https://i.delta.chat/#ABC"])
+def test_parser_admin_no_invite():
+    args = _build_parser().parse_args(["admin"])
+    assert args.subcommand == "admin"
+    assert args.invite is None
+
+
+def test_parser_admin_with_invite():
+    args = _build_parser().parse_args(["admin", "https://i.delta.chat/#ABC"])
+    assert args.subcommand == "admin"
     assert args.invite == "https://i.delta.chat/#ABC"
 
 

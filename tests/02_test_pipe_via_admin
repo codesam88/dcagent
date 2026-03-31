@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# Test 01 – end-to-end message delivery
+# Test end-to-end interaction and message delivery by launching two bot
+# instances to join and talk to each other.
 #
 # Two dcagent instances:
 #   OWNER — owns the admin channel, receives the message
@@ -10,8 +11,7 @@
 # confirming end-to-end delivery over the chatmail network.
 #
 # Usage:
-#   bash tests/test_01_echo.sh
-#   CHATMAIL=https://my.server/new bash tests/test_01_echo.sh
+#   make test-online
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -104,7 +104,7 @@ wait_for_log "$OWNER_LOG" "Listening at" "$TIMEOUT"
 # ── AGENT joins admin channel ─────────────────────────────────────────────────
 
 echo "==> AGENT joining admin channel ..."
-CHAT_ID=$($AGENT join "$INVITE" 2>/dev/null)
+CHAT_ID=$($AGENT admin "$INVITE" 2>/dev/null)
 [[ "$CHAT_ID" =~ ^[0-9]+$ ]] || { echo "ERROR: could not parse chat_id from join output: '$CHAT_ID'" >&2; exit 1; }
 echo "    chat_id=$CHAT_ID"
 
