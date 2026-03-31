@@ -11,13 +11,13 @@ Review the README for general intro and usage.
 2. Inside the project root directory, Agents can change or delete any files which
    are tracked in git. But ask the user before modifying files not tracked in git.
 
-2. Before working on files, re-read them in case they were changed by the user.
+3. Before working on files, re-read them in case they were changed by the user.
 
-3. After any modification, always run tests (`make test`)
+4. After any modification, always run tests (`make test`)
 
-4. Once tests are successful, run the code-formatter and ask the user for review.
+5. Once tests are successful, run the code-formatter and ask the user for review.
 
-5. Once the user is happy or about to commit, review the documentation for nay
+6. Once the user is happy or about to commit, review the documentation for any
    necessary updates.
 
 ### Make Commands Reference
@@ -32,7 +32,7 @@ Review the README for general intro and usage.
 
 ## Testing
 
-Tests are implemented using pytest and static linker.
+Tests are implemented using pytest and static linter.
 Run all tests using `make test`.
 
 Or run specific tests using respective commands:
@@ -49,19 +49,6 @@ uv run pytest test_dcagent.py::test_dispatch_routing
 ```
 
 Tests are pretty basic right now, mocking `main.cli` where needed.
-When adding tests, follow this pattern for isolation:
-
-```python
-import main
-
-original_cli = main.cli
-main.cli = MockCli()
-try:
-    # exercise the function under test
-finally:
-    main.cli = original_cli
-```
-
 More advanced tests require a live DeltaChat environment (Docker?)
 
 
