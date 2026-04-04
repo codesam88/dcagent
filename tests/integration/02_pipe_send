@@ -9,7 +9,7 @@ trap cleanup EXIT
 
 echo "==> Starting OWNER serve ..."
 > "$OWNER_LOG"
-$OWNER --logging debug serve >> "$OWNER_LOG" 2>&1 &
+$OWNER --log-level debug serve >> "$OWNER_LOG" 2>&1 &
 OWNER_PID=$!
 wait_for_log "$OWNER_LOG" "Listening at" "$TIMEOUT"
 

@@ -33,9 +33,8 @@ uv run dcagent init DCACCOUNT:https://nine.testrun.org/new
 > **FYI:** Replace `nine.testrun.org` with any other
 > [chatmail relay](https://chatmail.at/relays), or even a regular email account:
 > ```bash
-> uv run dcagent init --email bot@example.com --password MyPassword
+> uv run dcagent init bot@example.com MyPassword
 > ```
-> For other options see `uv run dcagent --help` or `uv run dcagent init --help`
 
 ### 3. Configure the agent
 
@@ -98,6 +97,12 @@ uv run dcagent serve
 
 Send a message to the agent in your Delta Chat app — it will echo it right back!
 
+Use `status` at any time to see the current account and invite links:
+
+```bash
+uv run dcagent status
+```
+
 ### 7. Send external commands
 
 The agent can accept commands from a Unix named pipe. Start with the `--pipe` option:
@@ -147,7 +152,10 @@ You can look them up in the Makefile and call directly, e.g.:
 uv run dcagent serve
 
 # Run with verbose logging
-RUST_LOG=info uv run dcagent serve
+uv run dcagent --log-level debug serve
+
+# Enable deltachat core (Rust) debug output
+RUST_LOG=debug uv run dcagent serve
 
 # Run tests
 uv run pytest -v

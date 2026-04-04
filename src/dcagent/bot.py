@@ -6,13 +6,14 @@ shared helpers, and main(). run_bot() has a minimal default implementation
 that agent.py overrides with the full handler/pipe stack.
 
 Usage:
-    dcagent [--config-dir PATH] [--logging LEVEL] [--log-file PATH] <subcommand> [args]
+    dcagent [--config-dir PATH] [--log-level LEVEL] [--log-file PATH] <subcommand> [args]
 
 Subcommands:
     init ADDR [PASSWORD]   – configure a new account
     config [KEY [VALUE]]   – get/set account configuration
     alert [INVITE]        – print personal invite link, or join a chat and add it to the alert group
     admin [INVITE]         – print admin-group invite link, or join one via SecureJoin
+    status                 – print account status and alert/admin invite links
     serve [--pipe PATH]    – run the bot (event loop + optional pipe listener)
 
 Pipe input format:
@@ -52,9 +53,7 @@ def _accounts_dir(config_dir: str) -> str:
     return os.path.join(config_dir, "accounts")
 
 
-def _first_accid(rpc: Rpc, args: Namespace) -> int:
-    if args.account:
-        return args.account
+def _get_account(rpc: Rpc) -> int:
     accounts = rpc.get_all_account_ids()
     if not accounts:
         raise AgentError("No accounts configured. Run 'init' first.")
@@ -139,8 +138,16 @@ def _securejoin(rpc: Rpc, accid: int, invite: str) -> int:
 
 
 def do_init(rpc: Rpc, args: Namespace) -> None:
-    """Configure a new or existing account."""
-    accid = args.account or rpc.add_account()
+    """Configure a new account (there can be only one)."""
+    accounts = rpc.get_all_account_ids()
+    if not accounts:
+        accid = rpc.add_account()
+    else:
+        if args.force:
+            accid = accounts[0]
+        else:
+            raise AgentError("Account is already initialized. Use init --force to re-initialize.")
+
     rpc.set_config(accid, "bot", "1")
     log.info("Configuring account #%d ...", accid)
 
@@ -186,7 +193,7 @@ def do_init(rpc: Rpc, args: Namespace) -> None:
 
 def do_config(rpc: Rpc, args: Namespace) -> None:
     """Get or set account configuration values."""
-    accid = _first_accid(rpc, args)
+    accid = _get_account(rpc)
     if args.value is not None:
         rpc.set_config(accid, args.key, args.value)
     if args.key:
@@ -212,7 +219,7 @@ def do_alert(rpc: Rpc, args: Namespace) -> None:
     the alert group (ui.alert_chats). The pipe listener will send messages to
     all chats in this group.
     """
-    accid = _first_accid(rpc, args)
+    accid = _get_account(rpc)
     _ensure_configured(rpc, accid)
 
     if not args.invite:
@@ -234,7 +241,7 @@ def do_admin(rpc: Rpc, args: Namespace) -> None:
     With an invite argument: joins the admin channel identified by the SecureJoin
     invite link and stores it as this bot's admin chat.
     """
-    accid = _first_accid(rpc, args)
+    accid = _get_account(rpc)
     _ensure_configured(rpc, accid)
 
     if not args.invite:
@@ -247,9 +254,23 @@ def do_admin(rpc: Rpc, args: Namespace) -> None:
     log.info("Joined admin channel (chat_id=%s)", chat_id)
 
 
+def do_status(rpc: Rpc, args: Namespace) -> None:
+    """Print account status"""
+    accid = _get_account(rpc)
+    configured = rpc.is_configured(accid)
+    addr = rpc.get_config(accid, "addr") or "(no address)"
+    displayname = rpc.get_config(accid, "displayname") or ""
+    name_part = f" ({displayname})" if displayname else ""
+    status = "configured" if configured else "not configured"
+    print(f"Account #{accid}: {addr}{name_part} [{status}]")
+
+    if not configured:
+        return
+
+
 def do_serve(rpc: Rpc, args: Namespace) -> None:
     """Start the bot event loop."""
-    accid = _first_accid(rpc, args)
+    accid = _get_account(rpc)
     _ensure_configured(rpc, accid)
     run_bot(rpc, accid, pipe_path=getattr(args, "pipe", None))
 
@@ -295,28 +316,28 @@ def _build_parser() -> ArgumentParser:
         default=user_config_dir(APP_NAME),
         help="configuration folder (default: %(default)s)",
     )
-    parser.add_argument("--account", "-a", metavar="ID", type=int, help="account ID to operate on")
     parser.add_argument(
-        "--logging",
+        "--log-file",
         "-l",
+        metavar="PATH",
+        help="also write logs to this file",
+    )
+    parser.add_argument(
+        "--log-level",
         metavar="LEVEL",
         default="info",
         choices=["debug", "info", "warning", "error"],
         help="log level (default: %(default)s)",
     )
-    parser.add_argument(
-        "--log-file",
-        metavar="PATH",
-        help="also write logs to this file",
-    )
 
     sub = parser.add_subparsers(title="subcommands", dest="subcommand")
 
     p = sub.add_parser("init", help="configure a new account")
+    p.add_argument("--force", "-f", action="store_true", help="force init even if an account already exists")
     p.add_argument("addr", help="email address or DCACCOUNT URI (e.g. DCACCOUNT:https://nine.testrun.org/new)")
     p.add_argument("password", nargs="?", help="password (not needed for DCACCOUNT URIs)")
 
-    p = sub.add_parser("config", help="get or set account configuration")
+    p = sub.add_parser("config", help="get or set account attributes")
     p.add_argument("key", nargs="?", help="config key")
     p.add_argument("value", nargs="?", help="value to set")
 
@@ -329,6 +350,8 @@ def _build_parser() -> ArgumentParser:
     p = sub.add_parser("serve", help="run the bot")
     p.add_argument("--pipe", metavar="PATH", help="path to Unix named pipe for external commands")
 
+    sub.add_parser("status", help="print bot/account status")
+
     return parser
 
 
@@ -337,14 +360,14 @@ def main(argv: Optional[list] = None) -> None:
     args = parser.parse_args(argv)
 
     logging.basicConfig(
-        level=getattr(logging, args.logging.upper()),
+        level=getattr(logging, args.log_level.upper()),
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     if args.log_file:
         fh = logging.FileHandler(args.log_file)
-        fh.setLevel(getattr(logging, args.logging.upper()))
+        fh.setLevel(getattr(logging, args.log_level.upper()))
         fh.setFormatter(
             logging.Formatter(
                 "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -358,7 +381,7 @@ def main(argv: Optional[list] = None) -> None:
         sys.exit(1)
 
     accounts_dir = _accounts_dir(args.config_dir)
-    kwargs = {} if args.logging == "debug" else {"stderr": subprocess.DEVNULL}
+    kwargs = {} if args.log_level == "debug" else {"stderr": subprocess.DEVNULL}
 
     try:
         with IOTransport(accounts_dir=accounts_dir, **kwargs) as trans:
@@ -370,6 +393,7 @@ def main(argv: Optional[list] = None) -> None:
                 "alert": do_alert,
                 "admin": do_admin,
                 "serve": do_serve,
+                "status": do_status,
             }
             dispatch[args.subcommand](rpc, args)
     except AgentError as exc:

@@ -13,6 +13,7 @@ from dcagent.bot import (
     _add_alert_chat,
     _build_parser,
     _ensure_configured,
+    _get_account,
     _get_admin_chats,
     _get_alert_chats,
     _get_or_create_admin_chat,
@@ -28,8 +29,7 @@ def test_parser_defaults():
     parser = _build_parser()
     args = parser.parse_args(["serve"])
     assert args.subcommand == "serve"
-    assert args.logging == "info"
-    assert args.account is None
+    assert args.log_level == "info"
     assert args.pipe is None
 
 
@@ -40,7 +40,14 @@ def test_parser_init():
     assert args.password is None
 
 
-def test_parser_init_with_password():
+def test_parser_init_force():
+    args = _build_parser().parse_args(["init", "--force", "user@example.com"])
+    assert args.force is True
+
+
+def test_parser_init_no_force_default():
+    args = _build_parser().parse_args(["init", "user@example.com"])
+    assert args.force is False
     args = _build_parser().parse_args(["init", "user@example.com", "secret"])
     assert args.addr == "user@example.com"
     assert args.password == "secret"
@@ -251,11 +258,8 @@ def test_ensure_configured_raises():
         _ensure_configured(rpc, accid=1)
 
 
-def test_first_accid_no_accounts_raises():
-    from dcagent.bot import _first_accid
-
+def test_get_account_no_accounts_raises():
     rpc = MagicMock()
     rpc.get_all_account_ids.return_value = []
-    args = _build_parser().parse_args(["serve"])
     with pytest.raises(AgentError, match="No accounts"):
-        _first_accid(rpc, args)
+        _get_account(rpc)
