@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Report failed systemd services to stdout.
+#
+# Usage:
+#   systemd-failed-alert                 # check all units
+#   systemd-failed-alert >> /run/dcagent.pipe
+#
+# Configuration (environment variables or /etc/dcagent/systemd-failed.conf):
+#
+#   WATCH_SERVICES   Space-separated list of service names to watch.
+#                    If set, only these services are checked.
+#                    Default: (all failed units)
+
+CONF_FILE="${CONF_FILE:-/etc/dcagent/systemd-failed.conf}"
+[[ -f "$CONF_FILE" ]] && source "$CONF_FILE"
+
+WATCH_SERVICES="${WATCH_SERVICES:-}"
+
+if [[ -n "$WATCH_SERVICES" ]]; then
+    for svc in $WATCH_SERVICES; do
+        state=$(systemctl is-failed "$svc" 2>/dev/null)
+        if [[ "$state" == "failed" ]]; then
+            echo "🔴 systemd service failed: $svc"
+        fi
+    done
+else
+    while read -r unit _load _active _sub _desc; do
+        [[ -z "$unit" ]] && continue
+        echo "🔴 systemd service failed: $unit"
+    done < <(systemctl --failed --no-legend --plain 2>/dev/null)
+fi

@@ -117,6 +117,12 @@ Then send commands:
 echo "alert!" > /tmp/dcagent.pipe
 ```
 
+Or pipe the output of a monitoring script directly:
+
+```bash
+examples/disk-space-alert >> /tmp/dcagent.pipe
+```
+
 ## Development
 
 ## Project Structure

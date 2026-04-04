@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+#
+# glances-dcagent-alert — forward a glances alert message to the dcagent pipe.
+#
+# Called by glances action lines; receives the alert text as a single argument.
+# Glances sanitises shell operators so redirection must be done here.
+#
+# Install to /etc/glances/glances-dcagent-alert and make executable:
+#   install -m 755 glances-dcagent-alert /etc/glances/
+#
+# Configuration:
+#   DCAGENT_PIPE  path to the dcagent named pipe (default: /run/dcagent.pipe)
+
+DCAGENT_PIPE="${DCAGENT_PIPE:-/run/dcagent.pipe}"
+
+if [[ -z "$1" ]]; then
+    echo "Usage: glances-dcagent-alert <message>" >&2
+    exit 1
+fi
+
+if [[ ! -p "$DCAGENT_PIPE" ]]; then
+    echo "glances-dcagent-alert: pipe not found: $DCAGENT_PIPE" >&2
+    exit 1
+fi
+
+printf '%s\n' "$1" > "$DCAGENT_PIPE"

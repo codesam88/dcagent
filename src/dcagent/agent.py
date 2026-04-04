@@ -45,8 +45,8 @@ def _pipe_forward(text: str, accid: int, rpc: Rpc) -> None:
         log.warning("pipe message received but no alert chats configured")
         return
     for chat_id in chat_ids:
+        log.debug("Pipe message to alert channel %d: %r", chat_id, text[:80])
         rpc.send_msg(accid, chat_id, MsgData(text=text))
-        log.info("Sent message to chat %s: %r", chat_id, text[:80])
 
 
 def _pipe_listener(path: str, accid: int, rpc: Rpc) -> None:
@@ -64,7 +64,7 @@ def _pipe_listener(path: str, accid: int, rpc: Rpc) -> None:
                     _pipe_forward(line, accid, rpc)
                 except Exception as exc:
                     log.exception("Error forwarding pipe message %r: %s", line, exc)
-        log.debug("Pipe writer disconnected, waiting for next writer")
+        log.debug("Pipe read eof, waiting for next writer")
 
 
 # ---------------------------------------------------------------------------

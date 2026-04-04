@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+#
+# disk-space-alert — print a line to stdout for each partition exceeding a
+# usage threshold. Pipe the output to dcagent:
+#   disk-space-alert >> /run/dcagent.pipe
+#
+# Configuration (environment variables or /etc/dcagent/disk-space.conf):
+#
+#   ALERT_THRESHOLD   Usage percentage that triggers an alert (0-100).
+#                     Default: 90
+#
+#   MONITOR_MOUNTS    Space-separated list of mount points to check.
+#                     Default: all non-virtual mounted filesystems
+#
+# Usage:
+#   Run from cron or a systemd timer, e.g. every 15 minutes:
+#     */15 * * * * root /usr/local/lib/dcagent/examples/disk-space-alert >> /run/dcagent.pipe
+
+set -euo pipefail
+
+# ── Defaults ──────────────────────────────────────────────────────────────────
+
+ALERT_THRESHOLD="${ALERT_THRESHOLD:-90}"
+MONITOR_MOUNTS="${MONITOR_MOUNTS:-}"
+
+# ── Load config file if present ───────────────────────────────────────────────
+
+CONF="/etc/dcagent/disk-space.conf"
+# shellcheck source=/dev/null
+[[ -f "$CONF" ]] && source "$CONF"
+
+# ── Check disk usage ──────────────────────────────────────────────────────────
+
+
+if [[ -n "$MONITOR_MOUNTS" ]]; then
+    df_output=$(df --output=pcent,target ${MONITOR_MOUNTS} 2>/dev/null | tail -n +2)
+else
+    df_output=$(df --output=pcent,target --exclude-type=tmpfs --exclude-type=devtmpfs \
+        --exclude-type=squashfs 2>/dev/null | tail -n +2)
+fi
+
+while read -r pct mount; do
+    pct="${pct%%%}"
+    if (( pct >= ALERT_THRESHOLD )); then
+        echo "⚠️ disk $mount is ${pct}% full (threshold: ${ALERT_THRESHOLD}%)"
+    fi
+done <<< "$df_output"
