@@ -103,7 +103,28 @@ Use `status` at any time to see the current account and invite links:
 uv run dcagent status
 ```
 
-### 7. Send external commands
+### 7. Set up heartbeat monitoring (optional)
+
+The `heartbeat` command manages heartbeat group chats. Multiple agents can
+join the same heartbeat group to monitor each other's liveness. Without an
+invite, it prints an invite link to the bot's heartbeat group:
+
+```bash
+uv run dcagent heartbeat
+```
+
+Have another agent join the heartbeat group:
+
+```bash
+uv run dcagent heartbeat <invite-link>
+```
+
+Once serving, agents periodically broadcast heartbeats. If a node stops
+responding, the elected master node sends an offline alert to all alert chats.
+Recovery is also detected and alerted. See [docs/heartbeat.md](docs/heartbeat.md)
+for the full protocol spec.
+
+### 8. Send external commands
 
 The agent can accept commands from a Unix named pipe. Start with the `--pipe` option:
 
@@ -114,7 +135,8 @@ uv run dcagent serve --pipe /tmp/dcagent.pipe
 Then send commands:
 
 ```bash
-echo "alert!" > /tmp/dcagent.pipe
+echo "alert My disk is full" > /tmp/dcagent.pipe
+echo "status disk 95%" > /tmp/dcagent.pipe
 ```
 
 Or pipe the output of a monitoring script directly:
@@ -129,13 +151,19 @@ examples/disk-space-alert >> /tmp/dcagent.pipe
 
 ```
 dcagent/
-├── main.py           # Single-file bot (all logic here)
-├── test_dcagent.py   # Pytest test suite
-├── pyproject.toml    # Project config, dependencies, ruff settings
-├── Makefile          # Developer shortcuts
-├── README.md         # User documentation
-├── AGENTS.md         # This file - agent guidance
-└── uv.lock
+├── src/dcagent/
+│   ├── agent.py          # Runtime: pipe listener, chat handlers, run_bot
+│   ├── bot.py            # CLI: argument parsing, account lifecycle commands
+│   └── heartbeat.py      # Heartbeat protocol implementation
+├── tests/
+│   ├── test_dcagent.py   # Unit tests (pytest + mocks)
+│   └── integration/      # End-to-end integration tests
+├── docs/
+│   └── heartbeat.md      # Heartbeat protocol spec
+├── examples/             # Monitoring script examples
+├── pyproject.toml        # Project config, dependencies, ruff settings
+├── Makefile              # Developer shortcuts
+└── README.md
 ```
 
 ### Useful commands

@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+#
+# Test heartbeat protocol end-to-end:
+# OWNER goes offline, AGENT detects it and sends an alert to the alert channel,
+# OWNER comes back online and receives the alert message.
+#
+# Uses HEARTBEAT_INTERVAL=5 (timeout=15s) to keep the test short.
+# Requires 01_alert_join to have run (AGENT must have an alert chat configured).
+
+set -euo pipefail
+source "$(dirname "$0")/helpers.sh"
+trap cleanup EXIT
+
+echo "==> Setting up heartbeat group: OWNER creates, AGENT joins ..."
+INVITE=$($OWNER heartbeat 2>/dev/null | grep '^https://' | head -1)
+echo "    invite=$INVITE"
+$AGENT heartbeat "$INVITE" 2>/dev/null
+
+echo "==> Starting OWNER and AGENT serve ..."
+> "$OWNER_LOG"
+HEARTBEAT_INTERVAL=5 $OWNER --log-level debug serve >> "$OWNER_LOG" 2>&1 &
+OWNER_PID=$!
+wait_for_log "$OWNER_LOG" "Listening at" "$TIMEOUT"
+
+> "$AGENT_LOG"
+HEARTBEAT_INTERVAL=5 $AGENT --log-level debug serve >> "$AGENT_LOG" 2>&1 &
+AGENT_PID=$!
+wait_for_log "$AGENT_LOG" "Listening at" "$TIMEOUT"
+
+echo "==> Waiting for heartbeats to be exchanged ..."
+wait_for_log "$OWNER_LOG" "Heartbeat received from" 30
+wait_for_log "$AGENT_LOG" "Heartbeat received from" 30
+echo "OK: heartbeats exchanged"
+
+echo "==> Stopping OWNER ..."
+kill "$OWNER_PID"
+OWNER_PID=""
+
+echo "==> Waiting for AGENT to detect OWNER offline and send alert (up to 30s) ..."
+wait_for_log "$AGENT_LOG" "node offline" 30
+echo "OK: AGENT detected OWNER offline"
+wait_for_log "$AGENT_LOG" "Heartbeat alert to chat" 10
+echo "OK: AGENT sent alert to alert channel"
+
+echo "==> Restarting OWNER to receive the queued alert ..."
+HEARTBEAT_INTERVAL=5 $OWNER --log-level debug serve >> "$OWNER_LOG" 2>&1 &
+OWNER_PID=$!
+wait_for_log "$OWNER_LOG" "Listening at" "$TIMEOUT"
+
+echo "==> Waiting for OWNER to receive the offline alert in its alert channel ..."
+wait_for_log "$OWNER_LOG" "Node offline" 60
+echo "OK: OWNER received alert message in alert channel"
+
+echo "==> Waiting for AGENT to detect OWNER recovered ..."
+wait_for_log "$AGENT_LOG" "node recovered" 30
+echo "OK: AGENT detected OWNER recovered"
+wait_for_log "$AGENT_LOG" "Node recovered" 10
+echo "OK: AGENT sent recovery alert to alert channel"
+
+echo "==> Waiting for OWNER to receive the recovery alert in its alert channel ..."
+wait_for_log "$OWNER_LOG" "Node recovered" 60
+echo "OK: OWNER received recovery alert message in alert channel"
+
+echo "==> 06_heartbeat: PASSED"

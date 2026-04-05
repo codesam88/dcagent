@@ -11,7 +11,8 @@ Usage:
 Subcommands:
     init ADDR [PASSWORD]   – configure a new account
     config [KEY [VALUE]]   – get/set account configuration
-    alert [INVITE]        – print personal invite link, or join a chat and add it to the alert group
+    alert [INVITE]        – print alert-group invite link, or join one via SecureJoin
+    heartbeat [INVITE]     – print heartbeat-group invite link, or join one via SecureJoin
     admin [INVITE]         – print admin-group invite link, or join one via SecureJoin
     status                 – print account status and alert/admin invite links
     serve [--pipe PATH]    – run the bot (event loop + optional pipe listener)
@@ -104,6 +105,38 @@ def _add_alert_chat(rpc: Rpc, accid: int, chat_id: int) -> None:
     if chat_id not in chats:
         chats.append(chat_id)
     rpc.set_config(accid, "ui.alert_chats", ",".join(str(c) for c in chats))
+
+
+def _get_or_create_alert_chat(rpc: Rpc, accid: int) -> int:
+    """Return the first alert chat, creating a new group if none exist."""
+    chats = _get_alert_chats(rpc, accid)
+    if chats:
+        return chats[0]
+    chatid = rpc.create_group_chat(accid, "Bot Alerts", True)
+    _add_alert_chat(rpc, accid, chatid)
+    return chatid
+
+
+def _get_heartbeat_chats(rpc: Rpc, accid: int) -> list[int]:
+    raw = rpc.get_config(accid, "ui.heartbeat_chats") or ""
+    return [int(x) for x in raw.split(",") if x.strip()]
+
+
+def _add_heartbeat_chat(rpc: Rpc, accid: int, chat_id: int) -> None:
+    chats = _get_heartbeat_chats(rpc, accid)
+    if chat_id not in chats:
+        chats.append(chat_id)
+    rpc.set_config(accid, "ui.heartbeat_chats", ",".join(str(c) for c in chats))
+
+
+def _get_or_create_heartbeat_chat(rpc: Rpc, accid: int) -> int:
+    """Return the first heartbeat chat, creating a new group if none exist."""
+    chats = _get_heartbeat_chats(rpc, accid)
+    if chats:
+        return chats[0]
+    chatid = rpc.create_group_chat(accid, "Bot Heartbeat", True)
+    _add_heartbeat_chat(rpc, accid, chatid)
+    return chatid
 
 
 def _get_or_create_alert_chat(rpc: Rpc, accid: int) -> int:
@@ -235,6 +268,28 @@ def do_alert(rpc: Rpc, args: Namespace) -> None:
     log.info("Joined alert chat (chat_id=%s)", chat_id)
 
 
+def do_heartbeat(rpc: Rpc, args: Namespace) -> None:
+    """Print the heartbeat-group invite link, or join one via SecureJoin.
+
+    Without an invite argument: prints the invite link for this bot's heartbeat
+    group, creating the group first if it doesn't exist.
+
+    With an invite argument: joins the chat via SecureJoin and registers it as
+    the heartbeat chat (ui.heartbeat_chats).
+    """
+    accid = _get_account(rpc)
+    _ensure_configured(rpc, accid)
+
+    if not args.invite:
+        chatid = _get_or_create_heartbeat_chat(rpc, accid)
+        print(rpc.get_chat_securejoin_qr_code(accid, chatid))
+        return
+
+    chat_id = _securejoin(rpc, accid, args.invite)
+    _add_heartbeat_chat(rpc, accid, chat_id)
+    log.info("Joined heartbeat chat (chat_id=%s)", chat_id)
+
+
 def do_admin(rpc: Rpc, args: Namespace) -> None:
     """Print the admin-group invite link, or join an existing one via SecureJoin.
 
@@ -347,6 +402,9 @@ def _build_parser() -> ArgumentParser:
     p = sub.add_parser("alert", help="print personal invite link, or join a chat and add it to the alert group")
     p.add_argument("invite", nargs="?", metavar="INVITE", help="if given, join this chat via SecureJoin")
 
+    p = sub.add_parser("heartbeat", help="print heartbeat-group invite link, or join one via SecureJoin")
+    p.add_argument("invite", nargs="?", metavar="INVITE", help="if given, join this chat via SecureJoin")
+
     p = sub.add_parser("admin", help="print admin-group invite link, or join one via SecureJoin")
     p.add_argument("invite", nargs="?", metavar="INVITE", help="if given, join this admin channel via SecureJoin")
 
@@ -394,6 +452,7 @@ def main(argv: Optional[list] = None) -> None:
                 "init": do_init,
                 "config": do_config,
                 "alert": do_alert,
+                "heartbeat": do_heartbeat,
                 "admin": do_admin,
                 "serve": do_serve,
                 "status": do_status,

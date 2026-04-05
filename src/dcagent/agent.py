@@ -18,7 +18,8 @@ from typing import Optional
 from deltachat2 import Bot, MsgData, Rpc, events
 
 import dcagent.bot as _bot
-from dcagent.bot import APP_NAME, AgentError, get_addrs
+import dcagent.heartbeat as _heartbeat
+from dcagent.bot import APP_NAME, get_addrs
 
 log = logging.getLogger(__name__)
 
@@ -112,8 +113,11 @@ def _on_new_message(bot: Bot, accid: int, event) -> None:
         tag = "<alert>"
     elif msg.chat_id in _bot._get_admin_chats(bot.rpc, accid):
         tag = "<admin>"
+    elif msg.chat_id in _bot._get_heartbeat_chats(bot.rpc, accid):
+        tag = "<heartbeat>"
     else:
-        raise AgentError("Received message was neither from alert nor admin chat")
+        log.debug("Received message from unknown chat %d, ignoring", msg.chat_id)
+        return
 
     bot.logger.info("Received message in chat %s %s: %r", msg.chat_id, tag, msg.text[:80])
 
@@ -137,14 +141,18 @@ def _on_ping(bot: Bot, accid: int, event) -> None:
 
 
 def run_bot(rpc: Rpc, accid: int, pipe_path: Optional[str] = None) -> None:
-    """Full implementation: message handlers + optional pipe listener."""
+    """Full implementation: message handlers + optional pipe listener + heartbeat."""
     addrs = get_addrs(rpc, accid)
+    our_addr = addrs[0] if addrs else ""
     log.info("Listening at: %s", ", ".join(addrs))
+
+    hb_state = _heartbeat.HeartbeatState()
 
     hooks = [
         (_on_new_message, events.NewMessage(is_bot=None)),
         (_on_help, events.NewMessage(command="/help")),
         (_on_ping, events.NewMessage(command="/ping")),
+        (_heartbeat.make_handler(hb_state), events.NewMessage(is_bot=None)),
     ]
     bot = Bot(rpc, hooks, logger=log)
 
@@ -157,6 +165,9 @@ def run_bot(rpc: Rpc, accid: int, pipe_path: Optional[str] = None) -> None:
         )
         t.start()
         log.info("Pipe listener started on %s", pipe_path)
+
+    if _bot._get_heartbeat_chats(rpc, accid):
+        _heartbeat.start(rpc, accid, our_addr, hb_state)
 
     while True:
         try:
