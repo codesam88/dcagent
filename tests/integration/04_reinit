@@ -15,8 +15,7 @@ source "$(dirname "$0")/helpers.sh"
     if echo "$output" | grep -q "\-\-force"; then
         echo "OK: got expected --force error"
     else
-        echo "FAIL: expected --force error, got: $output" >&2
-        exit 1
+        fatal_abort "expected --force error, got: $output"
     fi
 
 
@@ -36,14 +35,12 @@ source "$(dirname "$0")/helpers.sh"
     echo "  new addr=$new_addr displayname=$new_name"
 
     if [[ "$new_addr" == "$old_addr" ]]; then
-        echo "FAIL: addr did not change after --force reinit (still $old_addr)" >&2
-        exit 1
+        fatal_abort "addr did not change after --force reinit (still $old_addr)"
     fi
     echo "OK: addr changed ($old_addr -> $new_addr)"
 
     if [[ "$new_name" != "agent-reinit" ]]; then
-        echo "FAIL: displayname is '$new_name', expected 'agent-reinit'" >&2
-        exit 1
+        fatal_abort "displayname is '$new_name', expected 'agent-reinit'"
     fi
     echo "OK: displayname is '$new_name'"
 
@@ -54,4 +51,4 @@ source "$(dirname "$0")/helpers.sh"
 
 ) 9>"$AGENT_LOCK"
 
-echo "==> 04_reinit: PASSED"
+echo "PASS [$0]"

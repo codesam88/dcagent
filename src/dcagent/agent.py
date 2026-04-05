@@ -38,7 +38,7 @@ def _ensure_pipe(path: str) -> None:
         os.mkfifo(path)
 
 
-def _pipe_forward(text: str, accid: int, rpc: Rpc) -> None:
+def _pipe_do_alert(text: str, accid: int, rpc: Rpc) -> None:
     """Forward a single text message to all alert chats."""
     chat_ids = _bot._get_alert_chats(rpc, accid)
     if not chat_ids:
@@ -49,10 +49,41 @@ def _pipe_forward(text: str, accid: int, rpc: Rpc) -> None:
         rpc.send_msg(accid, chat_id, MsgData(text=text))
 
 
+def _pipe_do_status(args: str, accid: int, rpc: Rpc, status_map: dict) -> None:
+    """Update status_map[key]=value and write space-joined values to selfstatus."""
+    parts = args.split(None, 1)
+    if len(parts) < 2:
+        log.warning("pipe 'status' command requires a key and value, got: %r", args)
+        return
+    key, value = parts
+    status_map[key] = value
+    selfstatus = " ".join(v for _, v in sorted(status_map.items()))
+    log.debug("Pipe status update: %s=%r -> selfstatus=%r", key, value, selfstatus)
+    rpc.set_config(accid, "selfstatus", selfstatus)
+
+
+def _pipe_dispatch(line: str, accid: int, rpc: Rpc, status_map: dict) -> None:
+    """Parse and dispatch a single pipe line by its first word (command)."""
+    cmd, _, args = line.partition(" ")
+    args = args.strip()
+    if cmd == "alert":
+        _pipe_do_alert(args, accid, rpc)
+    elif cmd == "status":
+        _pipe_do_status(args, accid, rpc, status_map)
+    else:
+        log.warning("Unknown pipe command %r (line: %r)", cmd, line[:80])
+
+
 def _pipe_listener(path: str, accid: int, rpc: Rpc) -> None:
-    """Blocking loop that reads plain-text lines from the named pipe and forwards each to all alert chats."""
+    """Blocking loop that reads command lines from the named pipe and dispatches them.
+
+    Commands:
+        alert <message>       forward message to all alert chats
+        status <key> <msg>    update status element key to msg
+    """
     _ensure_pipe(path)
     log.info("Waiting for messages on %s", path)
+    status_map: dict[str, str] = {}
 
     while True:
         with open(path) as pipe:
@@ -61,9 +92,9 @@ def _pipe_listener(path: str, accid: int, rpc: Rpc) -> None:
                 if not line:
                     continue
                 try:
-                    _pipe_forward(line, accid, rpc)
+                    _pipe_dispatch(line, accid, rpc, status_map)
                 except Exception as exc:
-                    log.exception("Error forwarding pipe message %r: %s", line, exc)
+                    log.exception("Error handling pipe line %r: %s", line, exc)
         log.debug("Pipe read eof, waiting for next writer")
 
 

@@ -22,12 +22,9 @@ wait_for_file "$AGENT_PIPE" 10
 
 MSG="hello from integration test $$"
 echo "==> Sending: $MSG"
-printf '%s\n' "$MSG" > "$AGENT_PIPE"
+printf 'alert %s\n' "$MSG" > "$AGENT_PIPE"
 
 echo "==> Waiting for OWNER to receive the message ..."
-if ! wait_for_log "$OWNER_LOG" "$MSG" "$TIMEOUT"; then
-    dump_logs
-    exit 1
-fi
+wait_for_log "$OWNER_LOG" "$MSG" "$TIMEOUT"
 
 echo "PASS [$0]"

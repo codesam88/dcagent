@@ -18,6 +18,12 @@ AGENT_PIPE="$AGENT_DIR/cmd.pipe"
 OWNER_LOG="$OUT_DIR/owner-serve.log"
 AGENT_LOG="$OUT_DIR/agent-serve.log"
 
+fatal_abort() {
+    echo "FAIL: ${1:-aborted}" >&2
+    dump_logs
+    exit 1
+}
+
 wait_for_log() {
     local file="$1" pattern="$2" timeout="$3"
     local elapsed=0
@@ -25,8 +31,7 @@ wait_for_log() {
         sleep 1
         elapsed=$(( elapsed + 1 ))
         if (( elapsed >= timeout )); then
-            echo "TIMEOUT: '$pattern' not found in $file after ${timeout}s" >&2
-            return 1
+            fatal_abort "'$pattern' not found in $file after ${timeout}s"
         fi
     done
 }
@@ -38,17 +43,14 @@ wait_for_file() {
         sleep 1
         elapsed=$(( elapsed + 1 ))
         if (( elapsed >= timeout )); then
-            echo "TIMEOUT: $path did not appear after ${timeout}s" >&2
-            return 1
+            fatal_abort "$path did not appear after ${timeout}s"
         fi
     done
 }
 
 dump_logs() {
-    echo "--- OWNER log ($OWNER_LOG) ---" >&2
-    cat "$OWNER_LOG" >&2
-    echo "--- AGENT log ($AGENT_LOG) ---" >&2
-    cat "$AGENT_LOG" >&2
+    [[ -f "$OWNER_LOG" ]] && { echo "--- OWNER log ($OWNER_LOG) ---" >&2; cat "$OWNER_LOG" >&2; }
+    [[ -f "$AGENT_LOG" ]] && { echo "--- AGENT log ($AGENT_LOG) ---" >&2; cat "$AGENT_LOG" >&2; }
 }
 
 OWNER_PROVISIONED="$OWNER_DIR/.provisioning_success"

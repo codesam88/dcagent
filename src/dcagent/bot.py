@@ -17,7 +17,10 @@ Subcommands:
     serve [--pipe PATH]    – run the bot (event loop + optional pipe listener)
 
 Pipe input format:
-    One plain-text message per line — forwarded to all alert chats.
+    <command> [args...]
+
+    alert <message>         forward message to all alert chats
+    status <key> <msg>      update status element key to msg
 """
 
 import logging

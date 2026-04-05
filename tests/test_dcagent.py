@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from dcagent.agent import _pipe_forward
+from dcagent.agent import _pipe_do_alert
 from dcagent.bot import (
     APP_NAME,
     AgentError,
@@ -105,14 +105,14 @@ def test_parser_log_file_default():
 
 
 # ---------------------------------------------------------------------------
-# _pipe_forward
+# _pipe_do_alert
 # ---------------------------------------------------------------------------
 
 
-def test_pipe_forward_sends_to_alert_chats():
+def test_pipe_do_alert_sends_to_alert_chats():
     rpc = MagicMock()
     rpc.get_config.return_value = "42"
-    _pipe_forward("hello", accid=1, rpc=rpc)
+    _pipe_do_alert("hello", accid=1, rpc=rpc)
     rpc.send_msg.assert_called_once()
     call_args = rpc.send_msg.call_args
     assert call_args[0][0] == 1  # accid
@@ -120,19 +120,19 @@ def test_pipe_forward_sends_to_alert_chats():
     assert call_args[0][2].text == "hello"
 
 
-def test_pipe_forward_no_alert_chats(caplog):
+def test_pipe_do_alert_no_alert_chats(caplog):
     rpc = MagicMock()
     rpc.get_config.return_value = None
     with caplog.at_level(logging.WARNING, logger=APP_NAME):
-        _pipe_forward("hi", accid=1, rpc=rpc)
+        _pipe_do_alert("hi", accid=1, rpc=rpc)
     assert "no alert chats" in caplog.text
     rpc.send_msg.assert_not_called()
 
 
-def test_pipe_forward_multiple_chats():
+def test_pipe_do_alert_multiple_chats():
     rpc = MagicMock()
     rpc.get_config.return_value = "5,7,9"
-    _pipe_forward("hi", accid=1, rpc=rpc)
+    _pipe_do_alert("hi", accid=1, rpc=rpc)
     assert rpc.send_msg.call_count == 3
 
 
