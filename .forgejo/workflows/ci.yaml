@@ -1,0 +1,19 @@
+name: ci
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: codeberg-small
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv and pre-commit
+        run: pipx install uv && pipx install pre-commit
+
+      - name: Run tests
+        run: make test
