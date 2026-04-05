@@ -1,8 +1,8 @@
-# Build and publish release binaries for x86_64 and aarch64.
+# Build and publish release binary for x86_64.
 # Triggered by pushing a version tag (e.g. v0.2.0).
 #
-# x86_64: built natively on the ubuntu-latest runner.
-# aarch64: built inside a Docker + QEMU arm64 container on the same runner.
+# aarch64 builds require a self-hosted runner; add one with the
+# 'aarch64' label and duplicate this job if needed.
 
 name: release
 
@@ -12,43 +12,21 @@ on:
 
 jobs:
   dist:
-    strategy:
-      matrix:
-        include:
-          - arch: x86_64
-            native: true
-          - arch: aarch64
-            native: false
-
     runs-on: codeberg-medium
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up QEMU (aarch64 only)
-        if: "!matrix.native"
-        uses: docker/setup-qemu-action@v3
-
-      - name: Install uv (native build)
-        if: matrix.native
+      - name: Install uv
         run: pipx install uv
 
-      - name: Build dist (native x86_64)
-        if: matrix.native
+      - name: Build dist
         run: make dist
-
-      - name: Build dist (aarch64 via Docker + QEMU)
-        if: "!matrix.native"
-        run: |
-          docker run --rm --platform linux/arm64 \
-            -v "$PWD:/work" -w /work \
-            python:3.12-slim \
-            sh -c "pip install uv && uv run shiv -c dcagent -o dist/dcagent-aarch64.pyz ."
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dcagent-${{ matrix.arch }}.pyz
-          path: dist/dcagent-${{ matrix.arch }}.pyz
+          name: dcagent-x86_64.pyz
+          path: dist/dcagent-x86_64.pyz
 
   release:
     needs: dist
