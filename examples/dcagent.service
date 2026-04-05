@@ -1,0 +1,17 @@
+[Unit]
+Description=dcagent monitoring bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dcagent
+Environment=HOME=/var/lib/dcagent
+WorkingDirectory=/var/lib/dcagent
+RuntimeDirectory=dcagent
+ExecStart=/usr/local/bin/dcagent serve --pipe /run/dcagent/dcagent.pipe
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -54,8 +54,7 @@ def read_sensors() -> dict:
     return json.loads(result.stdout)
 
 
-def check_temps(data: dict, threshold_override: float | None,
-                ignore_prefixes: list[str]) -> None:
+def check_temps(data: dict, threshold_override: float | None, ignore_prefixes: list[str]) -> None:
 
     for chip, sensors in data.items():
         if not isinstance(sensors, dict):
@@ -79,10 +78,7 @@ def check_temps(data: dict, threshold_override: float | None,
                         or DEFAULT_FALLBACK_THRESHOLD
                     )
                 if current >= threshold:
-                    print(
-                        f"🌡️ {chip} {label}: "
-                        f"{current:.1f}°C >= {threshold:.1f}°C"
-                    )
+                    print(f"🌡️ {chip} {label}: {current:.1f}°C >= {threshold:.1f}°C")
 
 
 def main() -> None:

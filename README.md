@@ -145,6 +145,59 @@ Or pipe the output of a monitoring script directly:
 examples/disk-space-alert >> /tmp/dcagent.pipe
 ```
 
+## Deployment
+
+To run dcagent as a system service, download a pre-built binary from the
+[releases page](../../releases) and install it alongside the provided systemd
+unit.
+
+### 1. Install the binary
+
+```bash
+ARCH=$(uname -m)
+sudo install -m 755 dcagent-$ARCH.pyz /usr/local/bin/dcagent
+```
+
+### 2. Create a dedicated user and data directory
+
+```bash
+sudo useradd --system --home-dir /var/lib/dcagent \
+    --create-home --shell /usr/sbin/nologin dcagent
+```
+
+### 3. Configure the agent
+
+```bash
+sudo -u dcagent dcagent init DCACCOUNT:https://nine.testrun.org/new
+sudo -u dcagent dcagent config displayname "My Agent"
+sudo -u dcagent dcagent alert   # print invite link, share with recipients
+```
+
+### 4. Install and enable the systemd unit
+
+```bash
+sudo install -m 644 examples/dcagent.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now dcagent
+```
+
+The unit runs as the `dcagent` user, restarts on failure, and exposes a pipe
+at `/run/dcagent/dcagent.pipe` for external commands.
+
+Send alerts or status updates via the pipe:
+
+```bash
+echo "alert Disk /data is 95% full"    > /run/dcagent/dcagent.pipe
+echo "status 01_reboot [needs-reboot]" > /run/dcagent/dcagent.pipe
+```
+
+Check status and logs:
+
+```bash
+systemctl status dcagent
+journalctl -u dcagent -f
+```
+
 ## Development
 
 ## Project Structure

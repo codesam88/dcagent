@@ -1,10 +1,23 @@
 # examples/
 
 Scripts and configuration for monitoring a Linux host and forwarding alerts
-to dcagent. Scripts print to stdout — pipe them to the dcagent pipe:
+to dcagent.
+
+```
+examples/
+├── disk-space-alert          # Check partition usage
+├── temp-alert                # Check temperature sensors
+├── systemd-failed-alert      # Check for failed systemd units
+├── glances-alert-poller      # Poll glances REST API for warnings/criticals
+├── glances-dcagent-alert     # Glances action script
+├── glances.conf              # Glances threshold configuration
+└── dcagent.service           # Systemd unit for running dcagent as a service
+```
+
+Scripts print to stdout — pipe them to the dcagent pipe:
 
 ```bash
-disk-space-alert >> /run/dcagent.pipe
+examples/disk-space-alert >> /run/dcagent/dcagent.pipe
 ```
 
 ---
@@ -54,7 +67,7 @@ is only reported once. Pipe to dcagent alongside glances in server mode:
 
 ```bash
 glances -w &
-glances-alert-poller >> /run/dcagent.pipe
+examples/glances-alert-poller >> /run/dcagent/dcagent.pipe
 ```
 
 Note: `glances -s` runs the XML-RPC server (port 61209), which does **not**

@@ -76,7 +76,8 @@ def api_get(base_url: str, path: str, *, _warned: list = [False]) -> object:
         if not _warned[0]:
             log.warning(
                 "HTTP error from glances at %s: %s — is glances running with -w (web server)?",
-                base_url, exc,
+                base_url,
+                exc,
             )
             _warned[0] = True
     except URLError as exc:
@@ -147,8 +148,16 @@ def main() -> None:
 
     conf = load_conf()
     # Environment variables override config file
-    for key in ("GLANCES_URL", "POLL_INTERVAL", "FS_WARNING", "FS_CRITICAL",
-                "MEM_WARNING", "MEM_CRITICAL", "LOAD_WARNING", "LOAD_CRITICAL"):
+    for key in (
+        "GLANCES_URL",
+        "POLL_INTERVAL",
+        "FS_WARNING",
+        "FS_CRITICAL",
+        "MEM_WARNING",
+        "MEM_CRITICAL",
+        "LOAD_WARNING",
+        "LOAD_CRITICAL",
+    ):
         if key in os.environ:
             conf[key] = os.environ[key]
 
