@@ -1,5 +1,5 @@
 - [x] the testing of --force flag can interfere with account/channel setup and we don't want to setup new accounts all the time. lets move it into 00_provisioning, and skip it if accounts have already been created.
-- [ ] the release.yml action fails with error:
+- [x] the release.yml action fails with error:
       ```
       actions/upload-artifact@v41s
         (node:259) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
