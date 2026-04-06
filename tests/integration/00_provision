@@ -3,6 +3,9 @@
 # Provision OWNER and AGENT accounts.
 # Skips creation if the account has already been provisioned.
 # Run 'make clean' to reset and re-provision from scratch.
+#
+# When provisioning fresh, also verifies the --force flag behaviour:
+# init without --force must fail, and init --force must produce a new address.
 
 set -euo pipefail
 source "$(dirname "$0")/helpers.sh"
@@ -31,6 +34,25 @@ done
         echo "==> Provisioning AGENT on $CHATMAIL ..."
         $AGENT init "DCACCOUNT:$CHATMAIL"
         $AGENT config displayname "agent"
+
+        echo "==> Testing init without --force is rejected ..."
+        output=$($AGENT init "DCACCOUNT:$CHATMAIL" 2>&1 || true)
+        if echo "$output" | grep -q "\-\-force"; then
+            echo "OK: init without --force correctly refused"
+        else
+            fatal_abort "expected --force error, got: $output"
+        fi
+
+        echo "==> Testing init --force re-initializes the account ..."
+        old_addr=$($AGENT config addr 2>/dev/null | sed "s/addr='\(.*\)'/\1/")
+        $AGENT init --force "DCACCOUNT:$CHATMAIL"
+        new_addr=$($AGENT config addr 2>/dev/null | sed "s/addr='\(.*\)'/\1/")
+        if [[ "$new_addr" == "$old_addr" ]]; then
+            fatal_abort "addr did not change after --force reinit (still $old_addr)"
+        fi
+        echo "OK: addr changed ($old_addr -> $new_addr)"
+        $AGENT config displayname "agent"
+
         touch "$AGENT_PROVISIONED"
     fi
 ) 9>"$AGENT_LOCK"
