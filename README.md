@@ -126,10 +126,10 @@ for the full protocol spec.
 
 ### 8. Send external commands
 
-The agent can accept commands from a Unix named pipe. Start with the `--pipe` option:
+The agent can accept commands from a Unix named pipe. Start with the `--pipe-path` option:
 
 ```bash
-uv run dcagent serve --pipe /tmp/dcagent.pipe
+uv run dcagent serve --pipe-path /tmp/dcagent.pipe
 ```
 
 Then send commands:
@@ -142,7 +142,7 @@ echo "status disk 95%" > /tmp/dcagent.pipe
 Or pipe the output of a monitoring script directly:
 
 ```bash
-examples/disk-space-alert >> /tmp/dcagent.pipe
+examples/alerts/disk-space-alert >> /tmp/dcagent.pipe
 ```
 
 ## Deployment
@@ -176,7 +176,13 @@ sudo -u dcagent dcagent alert   # print invite link, share with recipients
 ### 4. Install and enable the systemd unit
 
 ```bash
-sudo install -m 644 examples/dcagent.service /etc/systemd/system/
+# Install the unit and environment file template
+sudo install -m 644 examples/systemd/dcagent.service /etc/systemd/system/
+sudo mkdir -p /etc/dcagent
+sudo install -m 640 examples/systemd/dcagent.conf /etc/default/dcagent
+sudo chown root:dcagent /etc/default/dcagent
+
+# Edit /etc/default/dcagent to adjust settings, then:
 sudo systemctl daemon-reload
 sudo systemctl enable --now dcagent
 ```

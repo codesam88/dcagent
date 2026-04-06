@@ -4,7 +4,7 @@ temp-alert — print a line to stdout for each sensor temperature exceeding a th
 Requires lm-sensors ('sensors' command).
 
 Pipe the output to dcagent:
-  temp-alert >> /run/dcagent.pipe
+  temp-alert >> /run/dcagent/dcagent.pipe
 
 Configuration (environment variables or /etc/dcagent/temp.conf, as KEY=VALUE):
 
@@ -17,7 +17,7 @@ Configuration (environment variables or /etc/dcagent/temp.conf, as KEY=VALUE):
 
 Usage:
   Run from cron or a systemd timer, e.g. every 5 minutes:
-    */5 * * * * root /usr/local/lib/dcagent/examples/temp-alert >> /run/dcagent.pipe
+    */5 * * * * root /usr/local/lib/dcagent/examples/alerts/temp-alert >> /run/dcagent/dcagent.pipe
 """
 
 import json
@@ -78,7 +78,7 @@ def check_temps(data: dict, threshold_override: float | None, ignore_prefixes: l
                         or DEFAULT_FALLBACK_THRESHOLD
                     )
                 if current >= threshold:
-                    print(f"🌡️ {chip} {label}: {current:.1f}°C >= {threshold:.1f}°C")
+                    print(f"alert 🌡️ {chip} {label}: {current:.1f}°C >= {threshold:.1f}°C")
 
 
 def main() -> None:

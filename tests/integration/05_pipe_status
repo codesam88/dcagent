@@ -8,7 +8,7 @@ trap cleanup EXIT
 
 echo "==> Starting AGENT serve (debug logging) ..."
 > "$AGENT_LOG"
-$AGENT --log-level debug serve --pipe "$AGENT_PIPE" >> "$AGENT_LOG" 2>&1 &
+$AGENT --log-level debug serve --pipe-path "$AGENT_PIPE" >> "$AGENT_LOG" 2>&1 &
 AGENT_PID=$!
 wait_for_log "$AGENT_LOG" "Listening at" "$TIMEOUT"
 wait_for_file "$AGENT_PIPE" 10

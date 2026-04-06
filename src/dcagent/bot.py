@@ -15,7 +15,7 @@ Subcommands:
     heartbeat [INVITE]     – print heartbeat-group invite link, or join one via SecureJoin
     admin [INVITE]         – print admin-group invite link, or join one via SecureJoin
     status                 – print account status and alert/admin invite links
-    serve [--pipe PATH]    – run the bot (event loop + optional pipe listener)
+    serve [--pipe-path PATH]    – run the bot (event loop + optional pipe listener)
 
 Pipe input format:
     <command> [args...]
@@ -180,7 +180,8 @@ def do_init(rpc: Rpc, args: Namespace) -> None:
         accid = rpc.add_account()
     else:
         if args.force:
-            accid = accounts[0]
+            rpc.remove_account(accounts[0])
+            accid = rpc.add_account()
         else:
             raise AgentError("Account is already initialized. Use init --force to re-initialize.")
 
@@ -330,7 +331,7 @@ def do_serve(rpc: Rpc, args: Namespace) -> None:
     """Start the bot event loop."""
     accid = _get_account(rpc)
     _ensure_configured(rpc, accid)
-    run_bot(rpc, accid, pipe_path=getattr(args, "pipe", None))
+    run_bot(rpc, accid, args.pipe_path, args.heartbeat)
 
 
 # ---------------------------------------------------------------------------
@@ -340,7 +341,7 @@ def do_serve(rpc: Rpc, args: Namespace) -> None:
 # ---------------------------------------------------------------------------
 
 
-def run_bot(rpc: Rpc, accid: int, pipe_path: Optional[str] = None) -> None:
+def run_bot(rpc: Rpc, accid: int, pipe_path: str, heartbeat_interval: int) -> None:
     """Minimal bot: bare event loop with no message handlers."""
     addrs = get_addrs(rpc, accid)
     log.info("Listening at: %s", ", ".join(addrs))
@@ -371,21 +372,22 @@ def _build_parser() -> ArgumentParser:
         "--config-dir",
         "-c",
         metavar="PATH",
-        default=user_config_dir(APP_NAME),
-        help="configuration folder (default: %(default)s)",
+        default=os.environ.get("DCAGENT_CONFIG_DIR", user_config_dir(APP_NAME)),
+        help="configuration folder (default: %(default)s, env: DCAGENT_CONFIG_DIR)",
     )
     parser.add_argument(
         "--log-file",
         "-l",
         metavar="PATH",
-        help="also write logs to this file",
+        default=os.environ.get("DCAGENT_LOG_FILE"),
+        help="also write logs to this file (env: DCAGENT_LOG_FILE)",
     )
     parser.add_argument(
         "--log-level",
         metavar="LEVEL",
-        default="info",
+        default=os.environ.get("DCAGENT_LOG_LEVEL", "info"),
         choices=["debug", "info", "warning", "error"],
-        help="log level (default: %(default)s)",
+        help="log level (default: %(default)s, env: DCAGENT_LOG_LEVEL)",
     )
 
     sub = parser.add_subparsers(title="subcommands", dest="subcommand")
@@ -409,7 +411,19 @@ def _build_parser() -> ArgumentParser:
     p.add_argument("invite", nargs="?", metavar="INVITE", help="if given, join this admin channel via SecureJoin")
 
     p = sub.add_parser("serve", help="run the bot")
-    p.add_argument("--pipe", metavar="PATH", help="path to Unix named pipe for external commands")
+    p.add_argument(
+        "--pipe-path",
+        metavar="PATH",
+        default=os.environ.get("DCAGENT_PIPE_PATH"),
+        help="path to Unix named pipe for external commands (env: DCAGENT_PIPE_PATH)",
+    )
+    p.add_argument(
+        "--heartbeat",
+        metavar="SECONDS",
+        type=int,
+        default=int(os.environ.get("DCAGENT_HEARTBEAT", "60")),
+        help="heartbeat interval in seconds (default: %(default)s, env: DCAGENT_HEARTBEAT)",
+    )
 
     sub.add_parser("status", help="print bot/account status")
 

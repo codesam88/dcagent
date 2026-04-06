@@ -2,7 +2,7 @@
 #
 # disk-space-alert — print a line to stdout for each partition exceeding a
 # usage threshold. Pipe the output to dcagent:
-#   disk-space-alert >> /run/dcagent.pipe
+#   disk-space-alert >> /run/dcagent/dcagent.pipe
 #
 # Configuration (environment variables or /etc/dcagent/disk-space.conf):
 #
@@ -14,7 +14,7 @@
 #
 # Usage:
 #   Run from cron or a systemd timer, e.g. every 15 minutes:
-#     */15 * * * * root /usr/local/lib/dcagent/examples/disk-space-alert >> /run/dcagent.pipe
+#     */15 * * * * root /usr/local/lib/dcagent/examples/alerts/disk-space-alert >> /run/dcagent/dcagent.pipe
 
 set -euo pipefail
 
@@ -42,6 +42,6 @@ fi
 while read -r pct mount; do
     pct="${pct%%%}"
     if (( pct >= ALERT_THRESHOLD )); then
-        echo "⚠️ disk $mount is ${pct}% full (threshold: ${ALERT_THRESHOLD}%)"
+        echo "alert ⚠️ disk $mount is ${pct}% full (threshold: ${ALERT_THRESHOLD}%)"
     fi
 done <<< "$df_output"

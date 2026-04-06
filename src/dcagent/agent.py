@@ -13,7 +13,6 @@ import os
 import stat
 import threading
 import time
-from typing import Optional
 
 from deltachat2 import Bot, MsgData, Rpc, events
 
@@ -140,19 +139,19 @@ def _on_ping(bot: Bot, accid: int, event) -> None:
 # ---------------------------------------------------------------------------
 
 
-def run_bot(rpc: Rpc, accid: int, pipe_path: Optional[str] = None) -> None:
+def run_bot(rpc: Rpc, accid: int, pipe_path: str, heartbeat_interval: int) -> None:
     """Full implementation: message handlers + optional pipe listener + heartbeat."""
     addrs = get_addrs(rpc, accid)
     our_addr = addrs[0] if addrs else ""
     log.info("Listening at: %s", ", ".join(addrs))
 
-    hb_state = _heartbeat.HeartbeatState()
+    hb_state = _heartbeat.HeartbeatState(interval=heartbeat_interval)
 
     hooks = [
         (_on_new_message, events.NewMessage(is_bot=None)),
         (_on_help, events.NewMessage(command="/help")),
         (_on_ping, events.NewMessage(command="/ping")),
-        (_heartbeat.make_handler(hb_state), events.NewMessage(is_bot=None)),
+        (hb_state.make_handler(), events.NewMessage(is_bot=None)),
     ]
     bot = Bot(rpc, hooks, logger=log)
 
@@ -167,7 +166,7 @@ def run_bot(rpc: Rpc, accid: int, pipe_path: Optional[str] = None) -> None:
         log.info("Pipe listener started on %s", pipe_path)
 
     if _bot._get_heartbeat_chats(rpc, accid):
-        _heartbeat.start(rpc, accid, our_addr, hb_state)
+        hb_state.start(rpc, accid, our_addr)
 
     while True:
         try:

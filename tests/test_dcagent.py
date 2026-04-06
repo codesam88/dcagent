@@ -30,7 +30,7 @@ def test_parser_defaults():
     args = parser.parse_args(["serve"])
     assert args.subcommand == "serve"
     assert args.log_level == "info"
-    assert args.pipe is None
+    assert args.pipe_path is None
 
 
 def test_parser_init():
@@ -90,8 +90,8 @@ def test_parser_admin_with_invite():
 
 
 def test_parser_serve_pipe():
-    args = _build_parser().parse_args(["serve", "--pipe", "/tmp/test.pipe"])
-    assert args.pipe == "/tmp/test.pipe"
+    args = _build_parser().parse_args(["serve", "--pipe-path", "/tmp/test.pipe"])
+    assert args.pipe_path == "/tmp/test.pipe"
 
 
 def test_parser_log_file():

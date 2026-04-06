@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+#
+# disk-status — report current disk usage to dcagent status.
+# Sends: status 30_disk <mount>:<pct>% [<mount>:<pct>% ...]
+# Pipe the output to dcagent:
+#   disk-status >> /run/dcagent/dcagent.pipe
+#
+# Configuration (environment variables or /etc/dcagent/disk-status.conf):
+#
+#   MONITOR_MOUNTS    Space-separated list of mount points to report.
+#                     Default: all non-virtual mounted filesystems
+#
+# Usage:
+#   Run from cron or a systemd timer, e.g. every 5 minutes:
+#     */5 * * * * root /usr/local/lib/dcagent/examples/status/disk-status >> /run/dcagent/dcagent.pipe
+
+set -euo pipefail
+
+# ── Defaults ──────────────────────────────────────────────────────────────────
+
+MONITOR_MOUNTS="${MONITOR_MOUNTS:-}"
+
+# ── Load config file if present ───────────────────────────────────────────────
+
+CONF="/etc/dcagent/disk-status.conf"
+# shellcheck source=/dev/null
+[[ -f "$CONF" ]] && source "$CONF"
+
+# ── Collect disk usage ────────────────────────────────────────────────────────
+
+if [[ -n "$MONITOR_MOUNTS" ]]; then
+    df_output=$(df --output=pcent,target ${MONITOR_MOUNTS} 2>/dev/null | tail -n +2)
+else
+    df_output=$(df --output=pcent,target --exclude-type=tmpfs --exclude-type=devtmpfs \
+        --exclude-type=squashfs 2>/dev/null | tail -n +2)
+fi
+
+parts=()
+while read -r pct mount; do
+    pct="${pct%%%}"
+    parts+=("${mount}:${pct}%")
+done <<< "$df_output"
+
+if (( ${#parts[@]} > 0 )); then
+    echo "status 30_disk ${parts[*]}"
+fi

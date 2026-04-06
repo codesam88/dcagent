@@ -11,7 +11,7 @@ Note: 'glances -s' runs the XML-RPC server (port 61209) which does NOT expose
 the REST API used by this script.
 
 Then pipe this script's output to dcagent:
-  glances-alert-poller >> /run/dcagent.pipe
+  glances-alert-poller >> /run/dcagent/dcagent.pipe
 
 Alerts fire when a metric first crosses WARNING or CRITICAL. A recovery message
 is sent when it drops back below WARNING.
@@ -104,9 +104,9 @@ def emit(alerts: dict, key: str, level: str, message: str) -> None:
     alerts[key] = level
     if level:
         icon = "🔴" if level == "CRITICAL" else "⚠️"
-        print(f"{icon} {level}: {message}", flush=True)
+        print(f"alert {icon} {level}: {message}", flush=True)
     elif prev:
-        print(f"✅ RECOVERED: {message}", flush=True)
+        print(f"alert ✅ RECOVERED: {message}", flush=True)
 
 
 def poll(base_url: str, conf: dict, alerts: dict) -> None:

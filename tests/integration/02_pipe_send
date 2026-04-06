@@ -15,7 +15,7 @@ wait_for_log "$OWNER_LOG" "Listening at" "$TIMEOUT"
 
 echo "==> Starting AGENT serve ..."
 > "$AGENT_LOG"
-$AGENT serve --pipe "$AGENT_PIPE" >> "$AGENT_LOG" 2>&1 &
+$AGENT serve --pipe-path "$AGENT_PIPE" >> "$AGENT_LOG" 2>&1 &
 AGENT_PID=$!
 wait_for_log "$AGENT_LOG" "Listening at" "$TIMEOUT"
 wait_for_file "$AGENT_PIPE" 10

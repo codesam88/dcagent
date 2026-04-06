@@ -4,26 +4,34 @@
 # OWNER goes offline, AGENT detects it and sends an alert to the alert channel,
 # OWNER comes back online and receives the alert message.
 #
-# Uses HEARTBEAT_INTERVAL=5 (timeout=15s) to keep the test short.
+# Uses --heartbeat 5 (timeout=15s) to keep the test short.
 # Requires 01_alert_join to have run (AGENT must have an alert chat configured).
 
 set -euo pipefail
 source "$(dirname "$0")/helpers.sh"
 trap cleanup EXIT
 
-echo "==> Setting up heartbeat group: OWNER creates, AGENT joins ..."
+echo "==> Setting up heartbeat group: OWNER creates invite ..."
 INVITE=$($OWNER heartbeat 2>/dev/null | grep '^https://' | head -1)
 echo "    invite=$INVITE"
-$AGENT heartbeat "$INVITE" 2>/dev/null
 
-echo "==> Starting OWNER and AGENT serve ..."
+echo "==> Getting OWNER alert invite (for AGENT re-join after 04_reinit) ..."
+ALERT_INVITE=$($OWNER alert 2>/dev/null | grep '^https://' | head -1)
+
+echo "==> Starting OWNER serve (needed for SecureJoin handshake) ..."
 > "$OWNER_LOG"
-HEARTBEAT_INTERVAL=5 $OWNER --log-level debug serve >> "$OWNER_LOG" 2>&1 &
+$OWNER --log-level debug serve --heartbeat 5 >> "$OWNER_LOG" 2>&1 &
 OWNER_PID=$!
 wait_for_log "$OWNER_LOG" "Listening at" "$TIMEOUT"
 
+echo "==> Re-joining AGENT to OWNER alert chat (AGENT was re-initialized in 04_reinit) ..."
+$AGENT alert "$ALERT_INVITE" 2>/dev/null
+
+echo "==> AGENT joining heartbeat group via SecureJoin ..."
+$AGENT heartbeat "$INVITE" 2>/dev/null
+
 > "$AGENT_LOG"
-HEARTBEAT_INTERVAL=5 $AGENT --log-level debug serve >> "$AGENT_LOG" 2>&1 &
+$AGENT --log-level debug serve --heartbeat 5 >> "$AGENT_LOG" 2>&1 &
 AGENT_PID=$!
 wait_for_log "$AGENT_LOG" "Listening at" "$TIMEOUT"
 
@@ -43,7 +51,7 @@ wait_for_log "$AGENT_LOG" "Heartbeat alert to chat" 10
 echo "OK: AGENT sent alert to alert channel"
 
 echo "==> Restarting OWNER to receive the queued alert ..."
-HEARTBEAT_INTERVAL=5 $OWNER --log-level debug serve >> "$OWNER_LOG" 2>&1 &
+$OWNER --log-level debug serve --heartbeat 5 >> "$OWNER_LOG" 2>&1 &
 OWNER_PID=$!
 wait_for_log "$OWNER_LOG" "Listening at" "$TIMEOUT"
 

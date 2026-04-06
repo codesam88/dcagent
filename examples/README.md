@@ -5,19 +5,32 @@ to dcagent.
 
 ```
 examples/
-├── disk-space-alert          # Check partition usage
-├── temp-alert                # Check temperature sensors
-├── systemd-failed-alert      # Check for failed systemd units
-├── glances-alert-poller      # Poll glances REST API for warnings/criticals
-├── glances-dcagent-alert     # Glances action script
-├── glances.conf              # Glances threshold configuration
-└── dcagent.service           # Systemd unit for running dcagent as a service
+├── alerts/
+│   ├── disk-space-alert          # Alert when partition usage exceeds threshold
+│   ├── temp-alert                # Alert when sensor temperature exceeds threshold
+│   ├── systemd-failed-alert      # Check for failed systemd units
+│   ├── glances-alert-poller      # Poll glances REST API for warnings/criticals
+│   ├── glances-dcagent-alert     # Glances action script
+│   └── glances.conf              # Glances threshold configuration
+├── status/
+│   ├── disk-status               # Report current disk usage to bot status
+│   └── temp-status               # Report current temperatures to bot status
+└── systemd/
+    ├── dcagent.service           # Systemd unit for running dcagent as a service
+    └── dcagent.conf              # Service config template (install as /etc/default/dcagent)
 ```
 
-Scripts print to stdout — pipe them to the dcagent pipe:
+Alert scripts print `alert <message>` lines to stdout — pipe them to the dcagent pipe:
 
 ```bash
-examples/disk-space-alert >> /run/dcagent/dcagent.pipe
+examples/alerts/disk-space-alert >> /run/dcagent/dcagent.pipe
+```
+
+Status scripts print a single `status <key> <value>` line that updates the bot's status message:
+
+```bash
+examples/status/disk-status >> /run/dcagent/dcagent.pipe
+examples/status/temp-status >> /run/dcagent/dcagent.pipe
 ```
 
 ---
@@ -33,6 +46,14 @@ point exceeding a threshold. Configure via environment variables or
 | `ALERT_THRESHOLD` | `90`    | Usage % that triggers an alert       |
 | `MONITOR_MOUNTS`  | (all)   | Space-separated list of mount points |
 
+`disk-status` reports current usage of all (or selected) partitions as a bot
+status update (`status 30_disk …`). Configure via environment variables or
+`/etc/dcagent/disk-status.conf`:
+
+| Variable         | Default | Description                          |
+|------------------|---------|--------------------------------------|
+| `MONITOR_MOUNTS` | (all)   | Space-separated list of mount points |
+
 ## Temperature sensors
 
 `temp-alert` reads `sensors -j` (lm-sensors) and prints a line for each
@@ -43,6 +64,15 @@ or `/etc/dcagent/temp.conf`:
 |---------------------|------------------|-------------------------------------------------|
 | `ALERT_THRESHOLD_C` | sensor's own max | Fixed °C threshold overriding per-sensor values |
 | `IGNORE_CHIPS`      | (none)           | Space-separated chip name prefixes to skip      |
+
+`temp-status` reports current readings from all (or selected) sensors as a bot
+status update (`status 20_temp …`). Configure via environment variables or
+`/etc/dcagent/temp-status.conf`:
+
+| Variable        | Default | Description                                        |
+|-----------------|---------|----------------------------------------------------|
+| `REPORT_CHIPS`  | (all)   | Space-separated chip name prefixes to include      |
+| `IGNORE_CHIPS`  | (none)  | Space-separated chip name prefixes to skip         |
 
 ## Failed systemd services
 
@@ -67,7 +97,7 @@ is only reported once. Pipe to dcagent alongside glances in server mode:
 
 ```bash
 glances -w &
-examples/glances-alert-poller >> /run/dcagent/dcagent.pipe
+examples/alerts/glances-alert-poller >> /run/dcagent/dcagent.pipe
 ```
 
 Note: `glances -s` runs the XML-RPC server (port 61209), which does **not**
@@ -80,7 +110,7 @@ Configure via environment variables or `/etc/dcagent/glances-poller.conf`:
 | `GLANCES_URL`    | `http://localhost:61208` | Base URL of the glances REST API |
 | `POLL_INTERVAL`  | `30`                     | Seconds between polls            |
 
-`glances.conf` and `glances-dcagent-alert` are also provided if you need to
+`alerts/glances.conf` and `alerts/glances-dcagent-alert` are also provided if you need to
 customise thresholds or trigger actions beyond what the poller covers.
 
 ---

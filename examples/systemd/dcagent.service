@@ -7,9 +7,10 @@ Wants=network-online.target
 Type=simple
 User=dcagent
 Environment=HOME=/var/lib/dcagent
+EnvironmentFile=-/etc/default/dcagent
 WorkingDirectory=/var/lib/dcagent
 RuntimeDirectory=dcagent
-ExecStart=/usr/local/bin/dcagent serve --pipe /run/dcagent/dcagent.pipe
+ExecStart=/usr/local/bin/dcagent serve
 Restart=on-failure
 RestartSec=10
 

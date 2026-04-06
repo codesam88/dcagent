@@ -37,10 +37,10 @@ heartbeat bot@example.com 42
 
 | Parameter            | Default | Description                                        |
 |----------------------|---------|----------------------------------------------------|
-| `HEARTBEAT_INTERVAL` | 60 s    | How often each node broadcasts a heartbeat message |
+| `--heartbeat` / `DCAGENT_HEARTBEAT` | 60 s    | How often each node broadcasts a heartbeat message |
 | `HEARTBEAT_TIMEOUT`  | 180 s   | Silence threshold (3 × interval) before offline    |
 
-Both are configurable via environment variable.
+The interval is configurable via the `--heartbeat SECONDS` CLI argument or `DCAGENT_HEARTBEAT` environment variable.
 
 ## Detection and alerting
 
@@ -62,7 +62,7 @@ interval) may produce a duplicate alert during transition — this is acceptable
 
 ## Alert messages
 
-Alerts are forwarded to the alert channel via the standard `_pipe_do_alert` path:
+Alerts are forwarded to the alert channel via the standard `_forward_alert` method:
 
 | Event     | Message                                      |
 |-----------|----------------------------------------------|
