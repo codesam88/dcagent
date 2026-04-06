@@ -49,9 +49,14 @@ class HeartbeatState:
         with self.lock:
             self.last_seen[addr] = time.monotonic()
 
-    def _is_master(self, our_addr: str, last_seen: dict[str, float], now: float) -> bool:
-        """Return True if we are the elected master (smallest addr among alive nodes)."""
-        alive = {addr for addr, ts in last_seen.items() if now - ts <= self.master_window}
+    def _is_master(self, our_addr: str, last_seen: dict[str, float], offline: set[str], now: float) -> bool:
+        """Return True if we are the elected master (smallest addr among alive nodes).
+
+        Nodes currently tracked as offline are excluded from the election so that
+        a recovering node cannot immediately displace the master that is handling
+        its offline/recovery lifecycle.
+        """
+        alive = {addr for addr, ts in last_seen.items() if now - ts <= self.master_window and addr not in offline}
         alive.add(our_addr)
         return our_addr == min(alive)
 
@@ -80,7 +85,9 @@ class HeartbeatState:
 
             now = time.monotonic()
             last_seen, offline_snap = self._read_state()
-            is_master = self._is_master(our_addr, last_seen, now)
+            # Offline nodes are excluded from master election so that a recovering
+            # node cannot immediately displace the master mid-lifecycle.
+            is_master = self._is_master(our_addr, last_seen, offline_snap, now)
 
             newly_offline = [
                 (addr, now - ts)

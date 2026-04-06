@@ -38,7 +38,7 @@ heartbeat bot@example.com 42
 | Parameter            | Default | Description                                        |
 |----------------------|---------|----------------------------------------------------|
 | `--heartbeat` / `DCAGENT_HEARTBEAT` | 60 s    | How often each node broadcasts a heartbeat message |
-| `HEARTBEAT_TIMEOUT`  | 180 s   | Silence threshold (3 × interval) before offline    |
+| `HEARTBEAT_TIMEOUT`  | 3 × interval | Silence threshold before a node is declared offline |
 
 The interval is configurable via the `--heartbeat SECONDS` CLI argument or `DCAGENT_HEARTBEAT` environment variable.
 
@@ -59,6 +59,12 @@ The master is implicitly elected as the node with the **lexicographically smalle
 This requires no coordination: if the master goes offline, the next node in
 sorted order promotes itself on its next check cycle. A brief overlap (~one
 interval) may produce a duplicate alert during transition — this is acceptable.
+
+Nodes that are currently tracked as **offline** are excluded from master
+election. This ensures that a recovering node does not immediately displace
+the master that detected its failure: the current master remains responsible
+through the full offline → recovery lifecycle and sends the recovery alert
+before the recovered node becomes eligible to be master again.
 
 ## Alert messages
 
