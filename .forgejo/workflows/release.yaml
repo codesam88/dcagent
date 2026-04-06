@@ -29,3 +29,4 @@ jobs:
         with:
           direction: upload
           release-dir: dist/release
+          token: ${{ secrets.GITHUB_TOKEN }}
