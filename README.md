@@ -161,8 +161,9 @@ sudo install -m 755 dcagent-$ARCH.pyz /usr/local/bin/dcagent
 ### 2. Create a dedicated user and data directory
 
 ```bash
-sudo useradd --system --home-dir /var/lib/dcagent \
-    --create-home --shell /usr/sbin/nologin dcagent
+sudo useradd --system --user-group \
+    --home-dir /var/lib/dcagent --create-home \
+    --shell /usr/sbin/nologin dcagent
 ```
 
 ### 3. Configure the agent
@@ -178,9 +179,7 @@ sudo -u dcagent dcagent alert   # print invite link, share with recipients
 ```bash
 # Install the unit and environment file template
 sudo install -m 644 examples/systemd/dcagent.service /etc/systemd/system/
-sudo mkdir -p /etc/dcagent
-sudo install -m 640 examples/systemd/dcagent.conf /etc/default/dcagent
-sudo chown root:dcagent /etc/default/dcagent
+sudo install -m 644 examples/systemd/dcagent.conf /etc/default/dcagent
 
 # Edit /etc/default/dcagent to adjust settings, then:
 sudo systemctl daemon-reload
