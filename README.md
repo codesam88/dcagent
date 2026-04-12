@@ -147,44 +147,44 @@ examples/alerts/disk-space-alert >> /tmp/dcagent.pipe
 
 ## Deployment
 
-To run dcagent as a system service, download a pre-built binary from the
-[releases page](../../releases) and install it alongside the provided systemd
-unit.
+To run dcagent as a system service, use the provided `setup.sh` helper.
 
-### 1. Install the binary
+### Install
 
 ```bash
-ARCH=$(uname -m)
-sudo install -m 755 dcagent-$ARCH.pyz /usr/local/bin/dcagent
+# Clone or download the repo, then:
+sudo examples/systemd/setup.sh
 ```
 
-### 2. Create a dedicated user and data directory
+The script downloads the latest release binary for your architecture from the
+[releases page](../../releases), creates a dedicated system user, installs the
+systemd unit and environment file, creates a chatmail account, and prints
+invite links for the alert, heartbeat, and admin groups.
+
+To use a locally built binary instead:
 
 ```bash
-sudo useradd --system --user-group \
-    --home-dir /var/lib/dcagent --create-home \
-    --shell /usr/sbin/nologin dcagent
+make dist
+make install   # calls setup.sh --pyz dist/dcagent-<arch>.pyz
 ```
 
-### 3. Configure the agent
+Pass `--launch` to enable and start the service immediately:
 
 ```bash
-sudo -u dcagent dcagent init DCACCOUNT:https://nine.testrun.org/new
-sudo -u dcagent dcagent config displayname "My Agent"
-sudo -u dcagent dcagent alert   # print invite link, share with recipients
+sudo examples/systemd/setup.sh --launch
 ```
 
-### 4. Install and enable the systemd unit
+### Uninstall
 
 ```bash
-# Install the unit and environment file template
-sudo install -m 644 examples/systemd/dcagent.service /etc/systemd/system/
-sudo install -m 644 examples/systemd/dcagent.conf /etc/default/dcagent
-
-# Edit /etc/default/dcagent to adjust settings, then:
-sudo systemctl daemon-reload
-sudo systemctl enable --now dcagent
+sudo examples/systemd/setup.sh --uninstall
 ```
+
+This stops and disables the service, removes the binary and systemd unit, and
+deletes the `dcagent` user. The configuration file at `/etc/default/dcagent`
+is preserved.
+
+### Usage
 
 The unit runs as the `dcagent` user, restarts on failure, and exposes a pipe
 at `/run/dcagent/dcagent.pipe` for external commands.
@@ -199,6 +199,7 @@ echo "status 01_reboot [needs-reboot]" > /run/dcagent/dcagent.pipe
 Check status and logs:
 
 ```bash
+dcagent status
 systemctl status dcagent
 journalctl -u dcagent -f
 ```

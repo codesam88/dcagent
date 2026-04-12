@@ -1,4 +1,4 @@
-.PHONY: run test test-online test-all lint format dist docs tags clean help
+.PHONY: run test test-online test-all lint format dist install uninstall docs tags clean help
 
 ARCH := $(shell uname -m)
 DIST_PYZ := dist/dcagent-$(ARCH).pyz
@@ -12,6 +12,8 @@ help:
 	@echo "  test-online      - Run unit tests then integration tests (requires network)"
 	@echo "  test-all         - Alias for test-online"
 	@echo "  dist             - Build release binary (dist/dcagent-<arch>.pyz)"
+	@echo "  install          - Install as a system service (builds dist if needed)"
+	@echo "  uninstall        - Remove a previously installed dcagent service"
 	@echo "  docs             - Regenerate docs/deltachat-rpc-api.md from installed binary"
 	@echo "  tags             - Generate ctags for src/ (vim/ctags)"
 	@echo "  format           - Format code"
@@ -40,12 +42,27 @@ format:
 	uv run ruff format
 
 # Build release binary for the current architecture
-dist: $(DIST_PYZ)
-
-$(DIST_PYZ): pyproject.toml uv.lock $(wildcard src/dcagent/*.py)
+dist:
 	mkdir -p dist
 	uv run shiv -c dcagent -o $(DIST_PYZ) .
-	@echo "Built: $(DIST_PYZ)"
+	@echo
+	@echo "Test generated binary:"
+	$(DIST_PYZ) status
+	@echo
+	@echo "Built done: $(DIST_PYZ)"
+
+$(DIST_PYZ):
+	$(MAKE) dist
+
+# Install as a system service
+install: $(DIST_PYZ)
+	@echo "Install as systemd service. Needs sudo. Will ask to confirm."
+	sudo examples/systemd/setup.sh --pyz $(DIST_PYZ)
+
+# Remove a previously installed dcagent service
+uninstall:
+	@echo "Uninstall systemd service. Needs sudo. Will ask to confirm."
+	sudo examples/systemd/setup.sh --uninstall
 
 # Regenerate API reference docs
 docs:

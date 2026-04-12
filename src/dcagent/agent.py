@@ -189,4 +189,19 @@ _bot.run_bot = run_bot
 
 def main() -> None:
     """Entry point: patches run_bot, then runs the standard CLI."""
+    # When running from a self-contained .pyz (shiv), deltachat-rpc-server is
+    # bundled inside the extraction directory but not on PATH. Skip if already
+    # findable; otherwise locate it via importlib.resources (the stdlib way to
+    # find data files inside an installed package).
+    import shutil
+
+    if not shutil.which("deltachat-rpc-server"):
+        try:
+            import importlib.resources
+
+            rpc_dir = str(importlib.resources.files("deltachat_rpc_server"))
+            os.environ["PATH"] = rpc_dir + os.pathsep + os.environ.get("PATH", "")
+        except (ImportError, TypeError):
+            pass
+
     _bot.main()

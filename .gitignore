@@ -5,6 +5,7 @@ build/
 dist/
 wheels/
 *.egg-info
+src/dcagent/_version.py
 
 # Virtual environments
 .venv

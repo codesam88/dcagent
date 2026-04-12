@@ -43,6 +43,15 @@ _INIT_TIMEOUT = 120
 log = logging.getLogger(__name__)
 
 
+def _get_version() -> str:
+    try:
+        from importlib.metadata import version
+
+        return version("dcagent")
+    except Exception:
+        return "unknown"
+
+
 class AgentError(Exception):
     """Fatal user-facing error — logged and exits with code 1."""
 
@@ -315,7 +324,12 @@ def do_admin(rpc: Rpc, args: Namespace) -> None:
 
 def do_status(rpc: Rpc, args: Namespace) -> None:
     """Print account status"""
-    accid = _get_account(rpc)
+    print(f"dcagent {_get_version()}")
+    accounts = rpc.get_all_account_ids()
+    if not accounts:
+        print("no accounts configured")
+        return
+    accid = accounts[0]
     configured = rpc.is_configured(accid)
     addr = rpc.get_config(accid, "addr") or "(no address)"
     displayname = rpc.get_config(accid, "displayname") or ""
@@ -368,6 +382,7 @@ def _build_parser() -> ArgumentParser:
         formatter_class=lambda prog: __import__("argparse").RawDescriptionHelpFormatter(prog),
     )
 
+    parser.add_argument("--version", action="version", version=f"%(prog)s {_get_version()}")
     parser.add_argument(
         "--config-dir",
         "-c",
