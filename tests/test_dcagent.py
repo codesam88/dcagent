@@ -187,7 +187,7 @@ def test_get_or_create_alert_chat_creates_new():
     rpc.create_group_chat.return_value = 55
     chatid = _get_or_create_alert_chat(rpc, accid=1)
     assert chatid == 55
-    rpc.create_group_chat.assert_called_once_with(1, "Bot Alerts", True)
+    rpc.create_group_chat.assert_called_once_with(1, "Bot alerts", True)
     rpc.set_config.assert_called_once_with(1, "ui.alert_chats", "55")
 
 
@@ -236,7 +236,7 @@ def test_get_or_create_admin_chat_creates_new():
     rpc.create_group_chat.return_value = 99
     chatid = _get_or_create_admin_chat(rpc, accid=1)
     assert chatid == 99
-    rpc.create_group_chat.assert_called_once_with(1, "Bot Admins", True)
+    rpc.create_group_chat.assert_called_once_with(1, "Bot admins", True)
     rpc.set_config.assert_called_once_with(1, "ui.admin_chats", "99")
 
 

@@ -87,7 +87,8 @@ def _get_or_create_admin_chat(rpc: Rpc, accid: int) -> int:
     chats = _get_admin_chats(rpc, accid)
     if chats:
         return chats[0]
-    chatid = rpc.create_group_chat(accid, "Bot Admins", True)
+    displayname = rpc.get_config(accid, "displayname") or "Bot"
+    chatid = rpc.create_group_chat(accid, f"{displayname} admins", True)
     _add_admin_chat(rpc, accid, chatid)
     return chatid
 
@@ -121,7 +122,8 @@ def _get_or_create_alert_chat(rpc: Rpc, accid: int) -> int:
     chats = _get_alert_chats(rpc, accid)
     if chats:
         return chats[0]
-    chatid = rpc.create_group_chat(accid, "Bot Alerts", True)
+    displayname = rpc.get_config(accid, "displayname") or "Bot"
+    chatid = rpc.create_group_chat(accid, f"{displayname} alerts", True)
     _add_alert_chat(rpc, accid, chatid)
     return chatid
 
@@ -143,18 +145,9 @@ def _get_or_create_heartbeat_chat(rpc: Rpc, accid: int) -> int:
     chats = _get_heartbeat_chats(rpc, accid)
     if chats:
         return chats[0]
-    chatid = rpc.create_group_chat(accid, "Bot Heartbeat", True)
+    displayname = rpc.get_config(accid, "displayname") or "Bot"
+    chatid = rpc.create_group_chat(accid, f"{displayname} heartbeat", True)
     _add_heartbeat_chat(rpc, accid, chatid)
-    return chatid
-
-
-def _get_or_create_alert_chat(rpc: Rpc, accid: int) -> int:
-    """Return the first alert chat, creating a new group if none exist."""
-    chats = _get_alert_chats(rpc, accid)
-    if chats:
-        return chats[0]
-    chatid = rpc.create_group_chat(accid, "Bot Alerts", True)
-    _add_alert_chat(rpc, accid, chatid)
     return chatid
 
 
