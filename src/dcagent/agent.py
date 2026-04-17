@@ -75,9 +75,12 @@ def _pipe_dispatch(line: str, accid: int, rpc: Rpc, status_map: dict) -> None:
         log.warning("Unknown pipe command %r (line: %r)", cmd, line[:80])
 
 
-def _run_parts_loop(directory: str, interval: int, name: str, accid: int, rpc: Rpc, status_map: dict) -> None:
+def _run_parts_loop(
+    directory: str, interval: int, name: str, accid: int, rpc: Rpc, status_map: dict, pipe_path: str
+) -> None:
     """Periodically invoke run-parts on directory, dispatching each stdout line to the pipe handler."""
     log.info("%s: running run-parts on %s every %ds", name, directory, interval)
+    env = {**os.environ, "DCAGENT_PIPE_PATH": pipe_path}
     while True:
         if os.path.isdir(directory):
             try:
@@ -86,6 +89,7 @@ def _run_parts_loop(directory: str, interval: int, name: str, accid: int, rpc: R
                     capture_output=True,
                     text=True,
                     check=False,
+                    env=env,
                 )
                 for line in result.stdout.splitlines():
                     line = line.strip()
@@ -207,7 +211,7 @@ def run_bot(
             if directory:
                 threading.Thread(
                     target=_run_parts_loop,
-                    args=(directory, interval, name, accid, rpc, status_map),
+                    args=(directory, interval, name, accid, rpc, status_map, pipe_path),
                     name=name,
                     daemon=True,
                 ).start()
