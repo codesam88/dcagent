@@ -82,6 +82,13 @@ Configure via environment variables or `/etc/dcagent/systemd-failed.conf`:
 |------------------|---------|---------------------------------------------------------|
 | `WATCH_SERVICES` | (all)   | Space-separated service names to watch (e.g. `nginx sshd`) |
 
+## Pending security updates (apt)
+
+`security-updates-alert` checks for pending security updates using
+`apt-get -s dist-upgrade` and reports them as a single alert plus a status
+entry (`status 10_updates`). Uses the existing apt cache — run `apt-get update`
+beforehand (e.g. in the same cron job) to keep results current.
+
 ---
 
 ## More ideas
@@ -94,7 +101,6 @@ Other conditions worth alerting on directly (not yet covered by examples):
 - **UPS / power status** — mains power lost, battery low (e.g. via `upsc`)
 - **RAID / mdadm degraded array** — a mirror is degraded or rebuilding
 - **Docker / container health** — a container with a health-check is unhealthy
-- **Pending security updates** — `apt` or `dnf` has unattended security updates queued
 - **Login / auth anomalies** — repeated failed SSH logins, new root session (via PAM or auth log)
 - **Swap pressure** — swap usage climbing
 - **IPv6 / WireGuard tunnel down** — tunnel interface missing or no traffic

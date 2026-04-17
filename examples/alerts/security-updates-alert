@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#
+# security-updates-alert — report pending security updates via apt.
+# Sends an alert listing all security packages and a status summary.
+#   alert 🔒 N security update(s) available: pkg1, pkg2, ...
+#   status 10_updates N security update(s) pending   (or: up to date)
+#
+# Pipe the output to dcagent:
+#   security-updates-alert >> /run/dcagent/dcagent.pipe
+#
+# NOTE: Uses the existing apt cache — run `apt-get update` beforehand
+# (e.g. via a systemd timer or cron) to keep results current.
+#
+# Usage:
+#   Run from cron or a systemd timer, e.g. every hour:
+#     0 * * * * root apt-get -qq update && /usr/local/lib/dcagent/examples/alerts/security-updates-alert >> /run/dcagent/dcagent.pipe
+
+set -euo pipefail
+
+# ── Discover pending security updates ────────────────────────────────────────
+
+# apt-get -s simulates the upgrade without changing anything.
+# Lines matching "^Inst ... security" identify packages from security repos.
+mapfile -t pkgs < <(
+    apt-get -s dist-upgrade 2>/dev/null \
+        | grep "^Inst" \
+        | grep -i "security" \
+        | awk '{print $2}'
+)
+
+count="${#pkgs[@]}"
+
+# ── Report ────────────────────────────────────────────────────────────────────
+
+if (( count > 0 )); then
+    pkg_list="${pkgs[*]}"
+    echo "alert 🔒 ${count} security update(s) available: ${pkg_list// /, }"
+	echo "status 10_updates need-patches"
+else
+    echo "status 10_updates up-to-date"
+fi
