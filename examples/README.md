@@ -44,8 +44,8 @@ point exceeding a threshold. Configure via environment variables or
 | `ALERT_THRESHOLD` | `90`    | Usage % that triggers an alert       |
 | `MONITOR_MOUNTS`  | (all)   | Space-separated list of mount points |
 
-`disk-status` reports current usage of all (or selected) partitions as a bot
-status update (`status 30_disk …`). Configure via environment variables or
+`disk-status` reports the usage of the most-full partition as a bot
+status update (`status 30_disk home:72%`). Configure via environment variables or
 `/etc/dcagent/disk-status.conf`:
 
 | Variable         | Default | Description                          |
@@ -63,8 +63,8 @@ or `/etc/dcagent/temp.conf`:
 | `ALERT_THRESHOLD_C` | sensor's own max | Fixed °C threshold overriding per-sensor values |
 | `IGNORE_CHIPS`      | (none)           | Space-separated chip name prefixes to skip      |
 
-`temp-status` reports current readings from all (or selected) sensors as a bot
-status update (`status 20_temp …`). Configure via environment variables or
+`temp-status` reports the highest reading across all (or selected) sensors as a bot
+status update (`status 20_temp 65°C`). Configure via environment variables or
 `/etc/dcagent/temp-status.conf`:
 
 | Variable        | Default | Description                                        |

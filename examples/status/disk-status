@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# disk-status — report current disk usage to dcagent status.
-# Sends: status 30_disk <mount>:<pct>% [<mount>:<pct>% ...]
+# disk-status — report the highest disk usage to dcagent status.
+# Sends: status 30_disk <mount>:<pct>%   (worst partition only, e.g. "home:72%")
 # Pipe the output to dcagent:
 #   disk-status >> /run/dcagent/dcagent.pipe
 #
 # Configuration (environment variables or /etc/dcagent/disk-status.conf):
 #
-#   MONITOR_MOUNTS    Space-separated list of mount points to report.
+#   MONITOR_MOUNTS    Space-separated list of mount points to check.
 #                     Default: all non-virtual mounted filesystems
 #
 # Usage:
@@ -26,7 +26,7 @@ CONF="/etc/dcagent/disk-status.conf"
 # shellcheck source=/dev/null
 [[ -f "$CONF" ]] && source "$CONF"
 
-# ── Collect disk usage ────────────────────────────────────────────────────────
+# ── Find worst partition ──────────────────────────────────────────────────────
 
 if [[ -n "$MONITOR_MOUNTS" ]]; then
     df_output=$(df --output=pcent,target ${MONITOR_MOUNTS} 2>/dev/null | tail -n +2)
@@ -35,12 +35,19 @@ else
         --exclude-type=squashfs 2>/dev/null | tail -n +2)
 fi
 
-parts=()
+worst_pct=0
+worst_mount=""
 while read -r pct mount; do
     pct="${pct%%%}"
-    parts+=("${mount}:${pct}%")
+    if (( pct > worst_pct )); then
+        worst_pct="$pct"
+        worst_mount="$mount"
+    fi
 done <<< "$df_output"
 
-if (( ${#parts[@]} > 0 )); then
-    echo "status 30_disk ${parts[*]}"
+if [[ -n "$worst_mount" ]]; then
+    # Use basename for brevity; keep "/" as-is
+    short="${worst_mount##*/}"
+    [[ -z "$short" ]] && short="/"
+    echo "status 30_disk ${short}:${worst_pct}%"
 fi

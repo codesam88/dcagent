@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-temp-status — report current sensor temperatures to dcagent status.
-Sends: status 20_temp <chip>:<temp>°C [<chip>:<temp>°C ...]
+temp-status — report the highest sensor temperature to dcagent status.
+Sends: status 20_temp <N>°C   (maximum reading across all monitored sensors)
 Requires lm-sensors ('sensors' command).
 
 Pipe the output to dcagent:
@@ -53,8 +53,8 @@ def read_sensors() -> dict:
     return json.loads(result.stdout)
 
 
-def collect_temps(data: dict, report_prefixes: list[str], ignore_prefixes: list[str]) -> list[str]:
-    parts = []
+def collect_temps(data: dict, report_prefixes: list[str], ignore_prefixes: list[str]) -> list[float]:
+    temps = []
     for chip, sensors in data.items():
         if not isinstance(sensors, dict):
             continue
@@ -68,10 +68,8 @@ def collect_temps(data: dict, report_prefixes: list[str], ignore_prefixes: list[
             for key, current in vals.items():
                 if not key.endswith("_input") or not isinstance(current, (int, float)):
                     continue
-                # Use a short label: chip-family + sensor label
-                chip_short = chip.split("-")[0]
-                parts.append(f"{chip_short}/{label}:{current:.0f}°C")
-    return parts
+                temps.append(float(current))
+    return temps
 
 
 def main() -> None:
@@ -86,10 +84,10 @@ def main() -> None:
     ignore_prefixes = ignore_raw.split()
 
     data = read_sensors()
-    parts = collect_temps(data, report_prefixes, ignore_prefixes)
+    temps = collect_temps(data, report_prefixes, ignore_prefixes)
 
-    if parts:
-        print(f"status 20_temp {' '.join(parts)}")
+    if temps:
+        print(f"status 20_temp {max(temps):.0f}°C")
 
 
 if __name__ == "__main__":
