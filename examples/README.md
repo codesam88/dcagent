@@ -8,29 +8,38 @@ examples/
 ├── alerts/
 │   ├── disk-space-alert          # Alert when partition usage exceeds threshold
 │   ├── temp-alert                # Alert when sensor temperature exceeds threshold
-│   ├── systemd-failed-alert      # Check for failed systemd units
-│   ├── glances-alert-poller      # Poll glances REST API for warnings/criticals
-│   ├── glances-dcagent-alert     # Glances action script
-│   └── glances.conf              # Glances threshold configuration
+│   └── systemd-failed-alert      # Check for failed systemd units
 ├── status/
 │   ├── disk-status               # Report current disk usage to bot status
 │   └── temp-status               # Report current temperatures to bot status
 └── systemd/
     ├── dcagent.service           # Systemd unit for running dcagent as a service
-    └── dcagent.conf              # Service config template (install as /etc/default/dcagent)
+    ├── dcagent.conf              # Service config template (install as /etc/dcagent/dcagent.conf)
+    └── setup.sh                  # Install/uninstall helper
 ```
 
-Alert scripts print `alert <message>` lines to stdout — pipe them to the dcagent pipe:
+Alert scripts print `alert <message>` lines to stdout. When running as a
+systemd service, dcagent invokes them automatically via `run-parts` from
+`/etc/dcagent/alert-enabled/`. They can also be run standalone with redirection:
 
 ```bash
 examples/alerts/disk-space-alert >> /run/dcagent/dcagent.pipe
 ```
 
-Status scripts print a single `status <key> <value>` line that updates the bot's status message:
+Status scripts print a single `status <key> <value>` line that updates the bot's
+status message. Run automatically from `/etc/dcagent/status-enabled/`, or
+standalone:
 
 ```bash
 examples/status/disk-status >> /run/dcagent/dcagent.pipe
 examples/status/temp-status >> /run/dcagent/dcagent.pipe
+```
+
+To enable a script, symlink it into the appropriate `-enabled/` directory:
+
+```bash
+ln -s /etc/dcagent/alert-available/disk-space-alert /etc/dcagent/alert-enabled/
+ln -s /etc/dcagent/status-available/disk-status      /etc/dcagent/status-enabled/
 ```
 
 ---
@@ -80,38 +89,9 @@ status update (`status 20_temp …`). Configure via environment variables or
 `systemctl --failed`. Optionally restrict to a specific set of services.
 Configure via environment variables or `/etc/dcagent/systemd-failed.conf`:
 
-| Variable          | Default | Description                                             |
-|-------------------|---------|---------------------------------------------------------|
-| `WATCH_SERVICES`  | (all)   | Space-separated service names to watch (e.g. `nginx sshd`) |
-
-## CPU load, memory, and more
-
-Users can leverage [glances](https://nicolargo.github.io/glances/) in server
-mode (`glances -s` or `glances -w`) to monitor various aspects of the host —
-CPU load, memory pressure, swap, disk I/O, network, and more — with default
-thresholds already configured out of the box.
-
-`glances-alert-poller` polls the glances REST API and forwards any active
-WARNING or CRITICAL events to stdout. Events are deduplicated so each alert
-is only reported once. Pipe to dcagent alongside glances in server mode:
-
-```bash
-glances -w &
-examples/alerts/glances-alert-poller >> /run/dcagent/dcagent.pipe
-```
-
-Note: `glances -s` runs the XML-RPC server (port 61209), which does **not**
-expose the REST API. Use `glances -w` (web server, port 61208) instead.
-
-Configure via environment variables or `/etc/dcagent/glances-poller.conf`:
-
-| Variable         | Default                  | Description                      |
-|------------------|--------------------------|----------------------------------|
-| `GLANCES_URL`    | `http://localhost:61208` | Base URL of the glances REST API |
-| `POLL_INTERVAL`  | `30`                     | Seconds between polls            |
-
-`alerts/glances.conf` and `alerts/glances-dcagent-alert` are also provided if you need to
-customise thresholds or trigger actions beyond what the poller covers.
+| Variable         | Default | Description                                             |
+|------------------|---------|---------------------------------------------------------|
+| `WATCH_SERVICES` | (all)   | Space-separated service names to watch (e.g. `nginx sshd`) |
 
 ---
 
@@ -127,7 +107,7 @@ Other conditions worth alerting on directly (not yet covered by examples):
 - **Docker / container health** — a container with a health-check is unhealthy
 - **Pending security updates** — `apt` or `dnf` has unattended security updates queued
 - **Login / auth anomalies** — repeated failed SSH logins, new root session (via PAM or auth log)
-- **Swap pressure** — swap usage climbing (complements the glances memory check)
+- **Swap pressure** — swap usage climbing
 - **IPv6 / WireGuard tunnel down** — tunnel interface missing or no traffic
 
 ---
