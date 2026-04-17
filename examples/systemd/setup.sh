@@ -13,9 +13,10 @@ CODEBERG_API="https://codeberg.org/api/v1/repos/codesam/dcagent/releases?limit=1
 SCRIPTDIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL_BIN=/usr/local/bin/dcagent
 SERVICE_DEST=/etc/systemd/system/dcagent.service
-CONF_DEST=/etc/default/dcagent
+CONF_DEST=/etc/dcagent/dcagent.conf
 DCAGENT_USER=dcagent
 DCAGENT_HOME=/var/lib/dcagent
+DCAGENT_CONF_DIR=/etc/dcagent
 ARCH=$(uname -m)
 DEFAULT_NAME="$(hostname -s) bot"
 LAUNCH=false
@@ -48,6 +49,7 @@ if $UNINSTALL; then
     echo "Installed files and accounts:"
     [[ -f "$INSTALL_BIN" ]]  && echo "  $INSTALL_BIN"
     [[ -f "$SERVICE_DEST" ]] && echo "  $SERVICE_DEST"
+    [[ -d "$DCAGENT_CONF_DIR" ]] && echo "  $DCAGENT_CONF_DIR  (not removed — may contain your scripts)"
     echo
     id "$DCAGENT_USER" &>/dev/null && echo "Will also remove user '$DCAGENT_USER' and home $DCAGENT_HOME"
     echo
@@ -120,8 +122,14 @@ fi
 
 run install -m 644 "$SCRIPTDIR/dcagent.service" "$SERVICE_DEST"
 if [[ ! -f "$CONF_DEST" ]]; then
+    run install -m 755 -d "$DCAGENT_CONF_DIR"
     run install -m 644 "$SCRIPTDIR/dcagent.conf" "$CONF_DEST"
 fi
+run install -m 755 -d \
+    "$DCAGENT_CONF_DIR/alert-available" \
+    "$DCAGENT_CONF_DIR/alert-enabled" \
+    "$DCAGENT_CONF_DIR/status-available" \
+    "$DCAGENT_CONF_DIR/status-enabled"
 run systemctl daemon-reload
 
 # Skip init if an account is already configured (e.g. re-install over existing setup)

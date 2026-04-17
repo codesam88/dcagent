@@ -338,7 +338,16 @@ def do_serve(rpc: Rpc, args: Namespace) -> None:
     """Start the bot event loop."""
     accid = _get_account(rpc)
     _ensure_configured(rpc, accid)
-    run_bot(rpc, accid, args.pipe_path, args.heartbeat)
+    run_bot(
+        rpc,
+        accid,
+        args.pipe_path,
+        args.heartbeat,
+        args.alert_dir,
+        args.alert_interval,
+        args.status_dir,
+        args.status_interval,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -348,7 +357,16 @@ def do_serve(rpc: Rpc, args: Namespace) -> None:
 # ---------------------------------------------------------------------------
 
 
-def run_bot(rpc: Rpc, accid: int, pipe_path: str, heartbeat_interval: int) -> None:
+def run_bot(
+    rpc: Rpc,
+    accid: int,
+    pipe_path: str,
+    heartbeat_interval: int,
+    alert_dir: str = "",
+    alert_interval: int = 60,
+    status_dir: str = "",
+    status_interval: int = 60,
+) -> None:
     """Minimal bot: bare event loop with no message handlers."""
     addrs = get_addrs(rpc, accid)
     log.info("Listening at: %s", ", ".join(addrs))
@@ -431,6 +449,32 @@ def _build_parser() -> ArgumentParser:
         type=int,
         default=int(os.environ.get("DCAGENT_HEARTBEAT", "60")),
         help="heartbeat interval in seconds (default: %(default)s, env: DCAGENT_HEARTBEAT)",
+    )
+    p.add_argument(
+        "--alert-dir",
+        metavar="PATH",
+        default=os.environ.get("DCAGENT_ALERT_DIR"),
+        help="run run-parts on this directory for alert scripts (env: DCAGENT_ALERT_DIR)",
+    )
+    p.add_argument(
+        "--alert-interval",
+        metavar="SECONDS",
+        type=int,
+        default=int(os.environ.get("DCAGENT_ALERT_INTERVAL", "60")),
+        help="how often to run alert scripts in seconds (default: %(default)s, env: DCAGENT_ALERT_INTERVAL)",
+    )
+    p.add_argument(
+        "--status-dir",
+        metavar="PATH",
+        default=os.environ.get("DCAGENT_STATUS_DIR"),
+        help="run run-parts on this directory for status scripts (env: DCAGENT_STATUS_DIR)",
+    )
+    p.add_argument(
+        "--status-interval",
+        metavar="SECONDS",
+        type=int,
+        default=int(os.environ.get("DCAGENT_STATUS_INTERVAL", "60")),
+        help="how often to run status scripts in seconds (default: %(default)s, env: DCAGENT_STATUS_INTERVAL)",
     )
 
     sub.add_parser("status", help="print bot/account status")

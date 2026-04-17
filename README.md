@@ -53,8 +53,9 @@ uv run dcagent config selfavatar ./avatar.png
 
 ### 4. Set up alert recipients
 
-The `alert` command manages the bot's alert group — a group chat that receives
-all pipe notifications. Without an invite, it prints an invite link to that group:
+The `alert` command manages the bot's alert group — a group chat named after
+the bot (e.g. `My Agent alerts`) that receives all pipe notifications. Without
+an invite, it prints an invite link to that group:
 
 ```bash
 uv run dcagent alert
@@ -73,8 +74,9 @@ message sent through the pipe.
 
 ### 5. Setup Admin Channel (optional)
 
-The `admin` command manages admin group chats. Without an invite, it prints an
-invite link to the bot's admin group:
+The `admin` command manages admin group chats. The group is named after the bot
+(e.g. `My Agent admins`). Without an invite, it prints an invite link to the
+bot's admin group:
 
 ```bash
 uv run dcagent admin
@@ -105,9 +107,9 @@ uv run dcagent status
 
 ### 7. Set up heartbeat monitoring (optional)
 
-The `heartbeat` command manages heartbeat group chats. Multiple agents can
-join the same heartbeat group to monitor each other's liveness. Without an
-invite, it prints an invite link to the bot's heartbeat group:
+The `heartbeat` command manages heartbeat group chats (named e.g. `My Agent heartbeat`).
+Multiple agents can join the same heartbeat group to monitor each other's liveness.
+Without an invite, it prints an invite link to the bot's heartbeat group:
 
 ```bash
 uv run dcagent heartbeat
@@ -139,10 +141,10 @@ echo "alert My disk is full" > /tmp/dcagent.pipe
 echo "status disk 95%" > /tmp/dcagent.pipe
 ```
 
-Or pipe the output of a monitoring script directly:
+Monitoring scripts write to stdout; redirect to the pipe when running standalone:
 
 ```bash
-examples/alerts/disk-space-alert >> /tmp/dcagent.pipe
+examples/alerts/disk-space-alert >> /run/dcagent/dcagent.pipe
 ```
 
 ## Deployment
@@ -181,15 +183,58 @@ sudo examples/systemd/setup.sh --uninstall
 ```
 
 This stops and disables the service, removes the binary and systemd unit, and
-deletes the `dcagent` user. The configuration file at `/etc/default/dcagent`
-is preserved.
+deletes the `dcagent` user. The configuration directory `/etc/dcagent/` is
+preserved (it may contain your alert and status scripts).
+
+### Configuration
+
+The service reads environment variables from `/etc/dcagent/dcagent.conf`.
+Key settings:
+
+| Variable | Default | Description |
+|---|---|---|
+| `DCAGENT_PIPE_PATH` | `/run/dcagent/dcagent.pipe` | Unix named pipe path |
+| `DCAGENT_ALERT_DIR` | `/etc/dcagent/alert-enabled` | Directory of alert scripts |
+| `DCAGENT_ALERT_INTERVAL` | `60` | How often to run alert scripts (seconds) |
+| `DCAGENT_STATUS_DIR` | `/etc/dcagent/status-enabled` | Directory of status scripts |
+| `DCAGENT_STATUS_INTERVAL` | `60` | How often to run status scripts (seconds) |
+| `DCAGENT_HEARTBEAT` | `60` | Heartbeat broadcast interval (seconds) |
+| `DCAGENT_LOG_LEVEL` | `info` | Log level (`debug`, `info`, `warning`, `error`) |
+
+### Alert and status scripts
+
+Place executable scripts in `/etc/dcagent/alert-available/` or
+`/etc/dcagent/status-available/`, then symlink them into the corresponding
+`-enabled/` directory to activate:
+
+```bash
+ln -s /etc/dcagent/alert-available/disk-space-alert /etc/dcagent/alert-enabled/
+ln -s /etc/dcagent/status-available/disk-status      /etc/dcagent/status-enabled/
+```
+
+dcagent runs `run-parts` on each `enabled/` directory at the configured
+interval, captures stdout, and dispatches each line to the pipe handler.
+Scripts just print to stdout:
+
+```bash
+#!/usr/bin/env bash
+echo "alert ⚠️ something went wrong"
+echo "status my_key some value"
+```
+
+Ready-made example scripts are in `examples/alerts/` and `examples/status/`.
+They can also be run standalone by redirecting to the pipe:
+
+```bash
+examples/alerts/disk-space-alert >> /run/dcagent/dcagent.pipe
+```
 
 ### Usage
 
 The unit runs as the `dcagent` user, restarts on failure, and exposes a pipe
 at `/run/dcagent/dcagent.pipe` for external commands.
 
-Send alerts or status updates via the pipe:
+Send alerts or status updates directly via the pipe:
 
 ```bash
 echo "alert Disk /data is 95% full"    > /run/dcagent/dcagent.pipe

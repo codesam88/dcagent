@@ -11,6 +11,7 @@ To use dcagent without the agent layer (bare event loop), run bot.main() directl
 import logging
 import os
 import stat
+import subprocess
 import threading
 import time
 
@@ -74,7 +75,33 @@ def _pipe_dispatch(line: str, accid: int, rpc: Rpc, status_map: dict) -> None:
         log.warning("Unknown pipe command %r (line: %r)", cmd, line[:80])
 
 
-def _pipe_listener(path: str, accid: int, rpc: Rpc) -> None:
+def _run_parts_loop(directory: str, interval: int, name: str, accid: int, rpc: Rpc, status_map: dict) -> None:
+    """Periodically invoke run-parts on directory, dispatching each stdout line to the pipe handler."""
+    log.info("%s: running run-parts on %s every %ds", name, directory, interval)
+    while True:
+        if os.path.isdir(directory):
+            try:
+                result = subprocess.run(
+                    ["run-parts", "--report", directory],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                for line in result.stdout.splitlines():
+                    line = line.strip()
+                    if line:
+                        try:
+                            _pipe_dispatch(line, accid, rpc, status_map)
+                        except Exception as exc:
+                            log.exception("%s: error dispatching line %r: %s", name, line, exc)
+            except Exception as exc:
+                log.warning("%s: run-parts error: %s", name, exc)
+        else:
+            log.debug("%s: directory %s does not exist, skipping", name, directory)
+        time.sleep(interval)
+
+
+def _pipe_listener(path: str, accid: int, rpc: Rpc, status_map: dict) -> None:
     """Blocking loop that reads command lines from the named pipe and dispatches them.
 
     Commands:
@@ -83,7 +110,6 @@ def _pipe_listener(path: str, accid: int, rpc: Rpc) -> None:
     """
     _ensure_pipe(path)
     log.info("Waiting for messages on %s", path)
-    status_map: dict[str, str] = {}
 
     while True:
         with open(path) as pipe:
@@ -139,7 +165,16 @@ def _on_ping(bot: Bot, accid: int, event) -> None:
 # ---------------------------------------------------------------------------
 
 
-def run_bot(rpc: Rpc, accid: int, pipe_path: str, heartbeat_interval: int) -> None:
+def run_bot(
+    rpc: Rpc,
+    accid: int,
+    pipe_path: str,
+    heartbeat_interval: int,
+    alert_dir: str = "",
+    alert_interval: int = 60,
+    status_dir: str = "",
+    status_interval: int = 60,
+) -> None:
     """Full implementation: message handlers + optional pipe listener + heartbeat."""
     addrs = get_addrs(rpc, accid)
     our_addr = addrs[0] if addrs else ""
@@ -156,14 +191,26 @@ def run_bot(rpc: Rpc, accid: int, pipe_path: str, heartbeat_interval: int) -> No
     bot = Bot(rpc, hooks, logger=log)
 
     if pipe_path:
-        t = threading.Thread(
+        status_map: dict[str, str] = {}
+        threading.Thread(
             target=_pipe_listener,
-            args=(pipe_path, accid, rpc),
+            args=(pipe_path, accid, rpc, status_map),
             name="pipe-listener",
             daemon=True,
-        )
-        t.start()
+        ).start()
         log.info("Pipe listener started on %s", pipe_path)
+
+        for directory, interval, name in [
+            (alert_dir, alert_interval, "alert-runner"),
+            (status_dir, status_interval, "status-runner"),
+        ]:
+            if directory:
+                threading.Thread(
+                    target=_run_parts_loop,
+                    args=(directory, interval, name, accid, rpc, status_map),
+                    name=name,
+                    daemon=True,
+                ).start()
 
     if _bot._get_heartbeat_chats(rpc, accid):
         hb_state.start(rpc, accid, our_addr)

@@ -11,6 +11,9 @@
 # Configuration:
 #   DCAGENT_PIPE_PATH  path to the dcagent named pipe (default: /run/dcagent/dcagent.pipe)
 
+DCAGENT_CONF="${DCAGENT_CONF:-/etc/dcagent/dcagent.conf}"
+# shellcheck source=/dev/null
+[[ -f "$DCAGENT_CONF" ]] && source "$DCAGENT_CONF"
 DCAGENT_PIPE_PATH="${DCAGENT_PIPE_PATH:-/run/dcagent/dcagent.pipe}"
 
 if [[ -z "$1" ]]; then
