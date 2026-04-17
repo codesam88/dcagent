@@ -1,22 +1,11 @@
 # examples/
 
 Scripts and configuration for monitoring a Linux host and forwarding alerts
-to dcagent.
+to dcagent. Three main areas are covered:
 
-```
-examples/
-├── alerts/
-│   ├── disk-space-alert          # Alert when partition usage exceeds threshold
-│   ├── temp-alert                # Alert when sensor temperature exceeds threshold
-│   └── systemd-failed-alert      # Check for failed systemd units
-├── status/
-│   ├── disk-status               # Report current disk usage to bot status
-│   └── temp-status               # Report current temperatures to bot status
-└── systemd/
-    ├── dcagent.service           # Systemd unit for running dcagent as a service
-    ├── dcagent.conf              # Service config template (install as /etc/dcagent/dcagent.conf)
-    └── setup.sh                  # Install/uninstall helper
-```
+- **alerts/** — scripts that detect and report problem conditions
+- **status/** — scripts that report current system state to the bot status message
+- **systemd/** — service unit, config template, and install/uninstall helper for running dcagent as a systemd service
 
 Alert scripts print `alert <message>` lines to stdout. When running as a
 systemd service, dcagent invokes them automatically via `run-parts` from

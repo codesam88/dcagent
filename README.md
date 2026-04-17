@@ -251,24 +251,13 @@ journalctl -u dcagent -f
 
 ## Development
 
-## Project Structure
+## Components
 
-```
-dcagent/
-├── src/dcagent/
-│   ├── agent.py          # Runtime: pipe listener, chat handlers, run_bot
-│   ├── bot.py            # CLI: argument parsing, account lifecycle commands
-│   └── heartbeat.py      # Heartbeat protocol implementation
-├── tests/
-│   ├── test_dcagent.py   # Unit tests (pytest + mocks)
-│   └── integration/      # End-to-end integration tests
-├── docs/
-│   └── heartbeat.md      # Heartbeat protocol spec
-├── examples/             # Monitoring script examples
-├── pyproject.toml        # Project config, dependencies, ruff settings
-├── Makefile              # Developer shortcuts
-└── README.md
-```
+- **`src/dcagent/`** — package source: `agent.py` (runtime, pipe listener, chat handlers), `bot.py` (CLI, account lifecycle), `heartbeat.py` (heartbeat protocol)
+- **`tests/`** — unit tests (pytest + mocks) and integration tests
+- **`docs/`** — protocol and feature documentation
+- **`examples/`** — monitoring scripts for alerts and status, plus systemd service setup
+- **`pyproject.toml`** / **`Makefile`** — project config and developer shortcuts
 
 ### Useful commands
 
