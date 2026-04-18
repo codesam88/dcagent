@@ -85,7 +85,7 @@ def _run_parts_loop(
         if os.path.isdir(directory):
             try:
                 result = subprocess.run(
-                    ["run-parts", "--report", directory],
+                    ["run-parts", directory],
                     capture_output=True,
                     text=True,
                     check=False,
