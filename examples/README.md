@@ -89,6 +89,14 @@ Configure via environment variables or `/etc/dcagent/systemd-failed.conf`:
 entry (`status 10_updates`). Uses the existing apt cache — run `apt-get update`
 beforehand (e.g. in the same cron job) to keep results current.
 
+## Distribution release status
+
+`distro-info` reports the current release codename and its lifecycle status
+as a bot status entry (`status 40_release noble [lts]`). Also sends an alert
+if a newer stable or LTS release is available. Supports Debian and Ubuntu;
+uses the `distro-info` package when installed, otherwise falls back to a
+built-in release table.
+
 ---
 
 ## More ideas

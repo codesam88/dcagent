@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+"""
+distro-info — report Linux distribution release status to dcagent status.
+Sends: status 01_release <Distro> <codename> [<label>]
+Also alerts if a newer stable/LTS release is available.
+
+  Debian labels:  stable, oldstable, testing, eol, unknown
+  Ubuntu labels:  lts, current, devel, eol
+
+Uses the 'distro-info' package (acts as a per-distro wrapper). If not
+installed or if it returns unexpected output, the status will indicate the
+error condition.
+
+Dependencies:
+  distro-info    apt install distro-info
+
+Pipe the output to dcagent:
+  distro-info >> /run/dcagent/dcagent.pipe
+
+Usage:
+  Run from a systemd timer or cron, e.g. daily:
+    0 6 * * * root /usr/local/lib/dcagent/examples/status/distro-info >> /run/dcagent/dcagent.pipe
+"""
+
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+# Fallback codename constants used only when distro-info succeeds but returns
+# an empty string for a specific query (highly unlikely; treated as error).
+_DEBIAN_STATUS = {
+    "forky": "testing",
+    "trixie": "stable",
+    "bookworm": "oldstable",
+    "bullseye": "oldoldstable",
+    "buster": "eol",
+    "stretch": "eol",
+    "jessie": "eol",
+}
+
+_UBUNTU_LATEST_LTS = "noble"
+_UBUNTU_LTS = {"noble", "jammy", "focal", "bionic", "xenial", "trusty"}
+
+
+def _os_release() -> dict:
+    data = {}
+    for line in Path("/etc/os-release").read_text().splitlines():
+        line = line.strip()
+        if "=" in line and not line.startswith("#"):
+            k, _, v = line.partition("=")
+            data[k] = v.strip('"')
+    return data
+
+
+def _run(cmd: list[str]) -> str | None:
+    """Run a command and return stripped stdout, or None on any error."""
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        output = result.stdout.strip()
+        if not output:
+            print(f"distro-info: {' '.join(cmd)} returned no output", file=sys.stderr)
+            return None
+        return output
+    except subprocess.CalledProcessError as exc:
+        print(f"distro-info: {' '.join(cmd)} failed: {exc.stderr.strip()}", file=sys.stderr)
+        return None
+    except FileNotFoundError:
+        return None
+
+
+def _check_distro_info() -> bool:
+    if shutil.which("distro-info"):
+        return True
+    print("distro-info: 'distro-info' not installed — apt install distro-info", file=sys.stderr)
+    return False
+
+
+def _debian_status(codename: str) -> tuple[str, str | None]:
+    """Return (label, new_stable_codename_or_None)."""
+    if not _check_distro_info():
+        return "no distro-info", None
+
+    stable = _run(["distro-info", "--stable"])
+    testing = _run(["distro-info", "--testing"])
+    oldstable = _run(["distro-info", "--oldstable"])
+
+    if stable is None or testing is None:
+        return "error", None
+
+    if codename == stable:
+        return "stable", None
+    if codename == testing:
+        return "testing", stable
+    if oldstable and codename == oldstable:
+        return "oldstable", stable
+    label = _DEBIAN_STATUS.get(codename, "unknown")
+    return label, stable
+
+
+def _ubuntu_status(codename: str, version_str: str) -> tuple[str, str | None]:
+    """Return (label, new_lts_codename_or_None)."""
+    if not _check_distro_info():
+        return "no distro-info", None
+
+    latest_lts = _run(["distro-info", "--lts"])
+    supported_raw = _run(["distro-info", "--supported"])
+    devel = _run(["distro-info", "--devel"])
+
+    if latest_lts is None or supported_raw is None:
+        return "error", None
+
+    supported = set(supported_raw.splitlines())
+    is_lts = "LTS" in version_str or codename in _UBUNTU_LTS
+
+    if codename == latest_lts:
+        return "lts", None
+    if codename in supported:
+        if devel and codename == devel:
+            return "devel", None
+        if is_lts:
+            return "lts", latest_lts
+        return "current", latest_lts
+    return "eol", latest_lts
+
+
+def main() -> None:
+    try:
+        info = _os_release()
+    except OSError as exc:
+        print(f"status 01_release error: {exc}", file=sys.stderr)
+        print("status 01_release error")
+        return
+
+    distro = info.get("ID", "").lower()
+    codename = info.get("VERSION_CODENAME", "").lower()
+    version = info.get("VERSION", "")
+
+    if not codename:
+        print("status 01_release unknown")
+        return
+
+    try:
+        if distro == "debian":
+            label, newer = _debian_status(codename)
+        elif distro == "ubuntu":
+            label, newer = _ubuntu_status(codename, version)
+        else:
+            print(f"status 01_release {distro.capitalize()} {codename} [unknown]")
+            return
+    except Exception as exc:
+        print(f"distro-info: unexpected error: {exc}", file=sys.stderr)
+        print(f"status 01_release {distro.capitalize()} {codename} [error]")
+        return
+
+    print(f"status 01_release {distro.capitalize()} {codename} [{label}]")
+    if newer:
+        print(f"alert ⬆️ new stable release available: {newer}")
+
+
+if __name__ == "__main__":
+    main()

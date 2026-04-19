@@ -98,6 +98,10 @@ def _run_parts_loop(
                             _pipe_dispatch(line, accid, rpc, status_map)
                         except Exception as exc:
                             log.exception("%s: error dispatching line %r: %s", name, line, exc)
+                if result.returncode != 0:
+                    detail = result.stderr.strip() or f"exit code {result.returncode}"
+                    log.error("%s: run-parts failed (rc=%d):\n%s", name, result.returncode, detail)
+                    _pipe_dispatch(f"alert 🔴 {name} script error — check log for details", accid, rpc, status_map)
             except Exception as exc:
                 log.warning("%s: run-parts error: %s", name, exc)
         else:
