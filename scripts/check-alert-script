@@ -3,8 +3,8 @@
 
 import os
 import re
-import sys
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -109,7 +109,7 @@ def main():
         else:
             target_dir = target_arg.rstrip("/")
             display_path = f"{target_dir}/{filepath.name}"
-        
+
         if not os.access(filepath, os.X_OK):
             print(f"  ❌ {display_path} — not executable")
             all_ok = False
@@ -124,10 +124,10 @@ def main():
         if not check_syntax(str(filepath), ftype):
             all_ok = False
             continue
-        
+
         # Check conventions (non-fatal)
         check_conventions(str(filepath), ftype)
-        
+
         print(f"  [ok] {display_path}")
 
     if not all_ok:
