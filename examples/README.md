@@ -3,30 +3,28 @@
 Scripts and configuration for monitoring a Linux host and forwarding alerts
 to dcagent. Three main areas are covered:
 
-- **actions/** — scripts that detect and report problem conditions (alerts) and update bot status (status). Actions can be executed by dcagent (run-parts) or scheduled via cron/systemd timers.
+- **actions/** — scripts that detect and report problem conditions (alerts) and update bot status. Actions live in `/etc/dcagent/actions` and are executed by external schedulers (cron or systemd timers).
 - **systemd/** — service unit, config template, and install/uninstall helper for running dcagent as a systemd service
 
-Alert scripts print `alert <message>` lines to stdout. When running as a
-systemd service, dcagent invokes them automatically via `run-parts` from
-`/etc/dcagent/alert-enabled/`. They can also be run standalone with redirection:
+Action scripts print `alert <message>` lines to stdout. They are not invoked by the agent itself; instead, use the provided per-user crontab (examples/systemd/dcagent.crontab) or install a systemd timer to run `run-parts` on the interval directories under `/etc/dcagent/cron/`. To add custom execution times, edit the dcagent user's crontab with `crontab -e -u dcagent`.
+
+Action scripts can also be run standalone with redirection:
 
 ```bash
 examples/actions/disk-space-alert >> /run/dcagent/dcagent.pipe
 ```
 
-Status scripts print a single `status <key> <value>` line that updates the bot's
-status message. Run automatically from `/etc/dcagent/status-enabled/`, or
-standalone:
+Status output is produced by action scripts as a single `status <key> <value>` line that updates the bot's status message. Schedule these scripts via the per-user crontab or a systemd timer, or run them standalone by redirecting their output to the dcagent pipe:
 
 ```bash
 examples/actions/disk-status >> /run/dcagent/dcagent.pipe
 examples/actions/temp-status >> /run/dcagent/dcagent.pipe
 ```
 
-To enable a script, symlink it into the action-enabled directory (or use a systemd timer/cron job):
+To enable a script for a given interval, create a symlink from the action script into the desired cron interval directory, for example:
 
 ```bash
-ln -s /etc/dcagent/action-available/disk-space-alert /etc/dcagent/action-enabled/
+ln -s /etc/dcagent/actions/disk-space-alert /etc/dcagent/cron/hourly.d/
 ```
 
 ---

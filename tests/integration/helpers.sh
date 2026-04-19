@@ -11,8 +11,8 @@ OUT_DIR="$TESTS_DIR/out"
 OWNER_DIR="$OUT_DIR/owner"
 AGENT_DIR="$OUT_DIR/agent"
 
-OWNER="$DCAGENT --config-dir $OWNER_DIR"
-AGENT="$DCAGENT --config-dir $AGENT_DIR"
+OWNER="$DCAGENT --account-db $OWNER_DIR"
+AGENT="$DCAGENT --account-db $AGENT_DIR"
 
 AGENT_PIPE="$AGENT_DIR/cmd.pipe"
 OWNER_LOG="$OUT_DIR/owner-serve.log"

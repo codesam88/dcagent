@@ -6,7 +6,7 @@ shared helpers, and main(). run_bot() has a minimal default implementation
 that agent.py overrides with the full handler/pipe stack.
 
 Usage:
-    dcagent [--config-dir PATH] [--log-level LEVEL] [--log-file PATH] <subcommand> [args]
+    dcagent [--account-db PATH] [--log-level LEVEL] [--log-file PATH] <subcommand> [args]
 
 Subcommands:
     init ADDR [PASSWORD]   – configure a new account
@@ -395,11 +395,11 @@ def _build_parser() -> ArgumentParser:
 
     parser.add_argument("--version", action="version", version=f"%(prog)s {_get_version()}")
     parser.add_argument(
-        "--config-dir",
+        "--account-db",
         "-c",
         metavar="PATH",
-        default=os.environ.get("DCAGENT_CONFIG_DIR", user_config_dir(APP_NAME)),
-        help="configuration folder (default: %(default)s, env: DCAGENT_CONFIG_DIR)",
+        default=os.environ.get("DCAGENT_ACCOUNT_DB", user_config_dir(APP_NAME)),
+        help="account database folder (default: %(default)s, env: DCAGENT_ACCOUNT_DB)",
     )
     parser.add_argument(
         "--log-file",
@@ -507,7 +507,7 @@ def main(argv: Optional[list] = None) -> None:
         parser.print_help()
         sys.exit(1)
 
-    accounts_dir = _accounts_dir(args.config_dir)
+    accounts_dir = _accounts_dir(args.account_db)
     kwargs = {} if args.log_level == "debug" else {"stderr": subprocess.DEVNULL}
 
     try:

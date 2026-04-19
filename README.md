@@ -194,27 +194,31 @@ Key settings:
 | Variable | Default | Description |
 |---|---|---|
 | `DCAGENT_PIPE_PATH` | `/run/dcagent/dcagent.pipe` | Unix named pipe path |
-| `DCAGENT_ALERT_DIR` | `/etc/dcagent/alert-enabled` | Directory of alert scripts |
-| `DCAGENT_ALERT_INTERVAL` | `60` | How often to run alert scripts (seconds) |
-| `DCAGENT_STATUS_DIR` | `/etc/dcagent/status-enabled` | Directory of status scripts |
-| `DCAGENT_STATUS_INTERVAL` | `60` | How often to run status scripts (seconds) |
+| `DCAGENT_CONFIG_FILE` | `/etc/dcagent/dcagent.conf` | Main config file (DCAGENT_CONFIG_DIR is derived from its directory) |
+| `DCAGENT_ACTION_INTERVAL` | `60` | How often to run action scripts when managed by dcagent (seconds) |
 | `DCAGENT_HEARTBEAT` | `60` | Heartbeat broadcast interval (seconds) |
 | `DCAGENT_LOG_LEVEL` | `info` | Log level (`debug`, `info`, `warning`, `error`) |
 
-### Alert and status scripts
+### Action scripts
 
-Place executable scripts in `/etc/dcagent/alert-available/` or
-`/etc/dcagent/status-available/`, then symlink them into the corresponding
-`-enabled/` directory to activate:
+Action scripts (both alerts and status producers) live under `/etc/dcagent/actions`.
+Scheduling is handled externally via cron or systemd timers. The provided
+`examples/systemd/setup.sh` creates cron interval directories under
+`/etc/dcagent/cron` (hourly.d, daily.d, weekly.d, monthly.d, yearly.d) and
+installs a default user crontab for the `dcagent` user that runs `run-parts`
+against those directories, redirecting output to the configured named pipe.
+To add custom execution times, edit the dcagent user's crontab with
+`crontab -e -u dcagent`.
+
+Place executable scripts in `/etc/dcagent/actions` and enable them for a
+given interval by creating a symlink into the desired cron interval directory,
+for example:
 
 ```bash
-ln -s /etc/dcagent/alert-available/disk-space-alert /etc/dcagent/alert-enabled/
-ln -s /etc/dcagent/status-available/disk-status      /etc/dcagent/status-enabled/
+ln -s /etc/dcagent/actions/security-updates-alert /etc/dcagent/cron/hourly.d/
 ```
 
-dcagent runs `run-parts` on each `enabled/` directory at the configured
-interval, captures stdout, and dispatches each line to the pipe handler.
-Scripts just print to stdout:
+Action scripts should write single-line commands to stdout:
 
 ```bash
 #!/usr/bin/env bash
