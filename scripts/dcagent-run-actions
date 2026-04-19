@@ -11,7 +11,6 @@ import shutil
 import subprocess
 import sys
 
-
 CRONTAB_BIN = os.environ.get("CRONTAB_BIN") or shutil.which("crontab")
 
 
