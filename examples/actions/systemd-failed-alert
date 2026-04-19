@@ -11,7 +11,13 @@
 #                    If set, only these services are checked.
 #                    Default: (all failed units)
 
+# Source action config (allows overriding DCAGENT_PIPE_PATH and other vars)
+ACTION_CONF="${DCAGENT_ACTION_CONF:-/etc/dcagent/dcagent.conf}"
+# shellcheck source=/dev/null
+[[ -f "$ACTION_CONF" ]] && source "$ACTION_CONF"
+
 CONF_FILE="${CONF_FILE:-/etc/dcagent/systemd-failed.conf}"
+# shellcheck source=/dev/null
 [[ -f "$CONF_FILE" ]] && source "$CONF_FILE"
 
 WATCH_SERVICES="${WATCH_SERVICES:-}"

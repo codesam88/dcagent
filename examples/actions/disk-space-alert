@@ -25,6 +25,11 @@ MONITOR_MOUNTS="${MONITOR_MOUNTS:-}"
 
 # ── Load config file if present ───────────────────────────────────────────────
 
+# Prefer action-specific conf, falling back to main dcagent config
+ACTION_CONF="${DCAGENT_ACTION_CONF:-/etc/dcagent/dcagent.conf}"
+# shellcheck source=/dev/null
+[[ -f "$ACTION_CONF" ]] && source "$ACTION_CONF"
+
 CONF="/etc/dcagent/disk-space.conf"
 # shellcheck source=/dev/null
 [[ -f "$CONF" ]] && source "$CONF"

@@ -17,6 +17,11 @@
 
 set -euo pipefail
 
+# Source action config (allows overriding DCAGENT_PIPE_PATH and other vars)
+ACTION_CONF="${DCAGENT_ACTION_CONF:-/etc/dcagent/dcagent.conf}"
+# shellcheck source=/dev/null
+[[ -f "$ACTION_CONF" ]] && source "$ACTION_CONF"
+
 # ── Discover pending security updates ────────────────────────────────────────
 
 # apt-get -s simulates the upgrade without changing anything.

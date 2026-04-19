@@ -22,10 +22,31 @@ Usage:
     0 6 * * * root /usr/local/lib/dcagent/examples/status/distro-info >> /run/dcagent/dcagent.pipe
 """
 
+import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+ACTION_CONF = os.environ.get("DCAGENT_ACTION_CONF", "/etc/dcagent/dcagent.conf")
+
+
+def _load_action_conf(path: str) -> dict:
+    conf = {}
+    p = Path(path)
+    if p.exists():
+        for line in p.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, _, v = line.partition("=")
+            conf[k.strip()] = v.strip().strip('"')
+    os.environ.update(conf)
+    return conf
+
+
+# Ensure env has DCAGENT_* vars set from action conf
+_load_action_conf(ACTION_CONF)
 
 # Fallback codename constants used only when distro-info succeeds but returns
 # an empty string for a specific query (highly unlikely; treated as error).

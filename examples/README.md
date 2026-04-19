@@ -3,8 +3,7 @@
 Scripts and configuration for monitoring a Linux host and forwarding alerts
 to dcagent. Three main areas are covered:
 
-- **alerts/** — scripts that detect and report problem conditions
-- **status/** — scripts that report current system state to the bot status message
+- **actions/** — scripts that detect and report problem conditions (alerts) and update bot status (status). Actions can be executed by dcagent (run-parts) or scheduled via cron/systemd timers.
 - **systemd/** — service unit, config template, and install/uninstall helper for running dcagent as a systemd service
 
 Alert scripts print `alert <message>` lines to stdout. When running as a
@@ -12,7 +11,7 @@ systemd service, dcagent invokes them automatically via `run-parts` from
 `/etc/dcagent/alert-enabled/`. They can also be run standalone with redirection:
 
 ```bash
-examples/alerts/disk-space-alert >> /run/dcagent/dcagent.pipe
+examples/actions/disk-space-alert >> /run/dcagent/dcagent.pipe
 ```
 
 Status scripts print a single `status <key> <value>` line that updates the bot's
@@ -20,15 +19,14 @@ status message. Run automatically from `/etc/dcagent/status-enabled/`, or
 standalone:
 
 ```bash
-examples/status/disk-status >> /run/dcagent/dcagent.pipe
-examples/status/temp-status >> /run/dcagent/dcagent.pipe
+examples/actions/disk-status >> /run/dcagent/dcagent.pipe
+examples/actions/temp-status >> /run/dcagent/dcagent.pipe
 ```
 
-To enable a script, symlink it into the appropriate `-enabled/` directory:
+To enable a script, symlink it into the action-enabled directory (or use a systemd timer/cron job):
 
 ```bash
-ln -s /etc/dcagent/alert-available/disk-space-alert /etc/dcagent/alert-enabled/
-ln -s /etc/dcagent/status-available/disk-status      /etc/dcagent/status-enabled/
+ln -s /etc/dcagent/action-available/disk-space-alert /etc/dcagent/action-enabled/
 ```
 
 ---
@@ -46,7 +44,9 @@ point exceeding a threshold. Configure via environment variables or
 
 `disk-status` reports the usage of the most-full partition as a bot
 status update (`status 30_disk home:72%`). Configure via environment variables or
-`/etc/dcagent/disk-status.conf`:
+`/etc/dcagent/disk-status.conf`. Action scripts source `/etc/dcagent/dcagent.conf`
+(or the file pointed to by the DCAGENT_ACTION_CONF environment variable) so they
+inherit the configured DCAGENT_PIPE_PATH by default:
 
 | Variable         | Default | Description                          |
 |------------------|---------|--------------------------------------|
@@ -92,10 +92,10 @@ beforehand (e.g. in the same cron job) to keep results current.
 ## Distribution release status
 
 `distro-info` reports the current release codename and its lifecycle status
-as a bot status entry (`status 40_release noble [lts]`). Also sends an alert
+as a bot status entry (`status 01_release Ubuntu noble [lts]`). Also sends an alert
 if a newer stable or LTS release is available. Supports Debian and Ubuntu;
-uses the `distro-info` package when installed, otherwise falls back to a
-built-in release table.
+uses the `distro-info` package when installed and will surface a helpful
+error status if the tool is missing.
 
 ---
 
