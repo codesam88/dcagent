@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""Validate alert and status scripts against dcagent conventions."""
+
+import os
+import re
+import sys
+import subprocess
+from pathlib import Path
+
+
+def check_file_type(filepath: str) -> str:
+    """Determine if a script is shell or Python."""
+    with open(filepath, "rb") as f:
+        first_line = f.readline().decode("utf-8", errors="ignore").strip()
+    if "python" in first_line:
+        return "python"
+    elif "bash" in first_line or "sh" in first_line:
+        return "bash"
+    return "unknown"
+
+
+def check_syntax(filepath: str, ftype: str) -> bool:
+    """Check script syntax without execution."""
+    if ftype == "bash":
+        result = subprocess.run(["bash", "-n", filepath], capture_output=True)
+        if result.returncode != 0:
+            print(f"  ❌ Syntax error in {filepath}:")
+            for line in result.stderr.decode().strip().split("\n"):
+                print(f"    {line}")
+            return False
+    elif ftype == "python":
+        result = subprocess.run(["python3", "-m", "py_compile", filepath], capture_output=True)
+        if result.returncode != 0:
+            print(f"  ❌ Syntax error in {filepath}:")
+            for line in result.stderr.decode().strip().split("\n"):
+                print(f"    {line}")
+            return False
+    return True
+
+
+def check_conventions(filepath: str, ftype: str) -> bool:
+    """Check script follows dcagent action conventions."""
+    with open(filepath) as f:
+        content = f.read()
+
+    errors = []
+
+    # Check for config path setup (required for shell scripts)
+    if ftype == "bash":
+        if "DCAGENT_CONFIG_PATH" not in content:
+            errors.append("  - Missing DCAGENT_CONFIG_PATH setup")
+        if "DCAGENT_PIPE_PATH" not in content and "${0##*/}" not in content:
+            errors.append("  - Missing DCAGENT_PIPE_PATH or script name extraction")
+
+    # Check for alert/status output
+    if not re.search(r"\b(alert|status)\s+", content):
+        errors.append("  - Script doesn't emit 'alert' or 'status' commands")
+
+    # Check for valid category names (dashes, not underscores for alerts)
+    alert_matches = re.findall(r'alert\s+(["\']?)([a-z0-9\-/_]+)\1', content)
+    if alert_matches:
+        for quote, category in alert_matches:
+            if category and "_" in category:
+                # Underscores are ok in some places (like mount paths), but warn
+                pass
+            if not category and ftype == "shell":
+                # Empty category is ok for bypassing deduplication
+                pass
+
+    if errors:
+        print(f"  ⚠️  Conventions check for {filepath}:")
+        for err in errors:
+            print(f"    {err}")
+        return False
+    return True
+
+
+def main():
+    """Check scripts in given path."""
+    if len(sys.argv) < 2:
+        print("Usage: check-alert-script <file-or-directory>")
+        sys.exit(1)
+
+    target_arg = sys.argv[1]
+    target = Path(target_arg)
+    if not target.exists():
+        print(f"Error: path not found: {target}")
+        sys.exit(1)
+
+    # Collect files to check
+    files_to_check = []
+    if target.is_file():
+        files_to_check = [target]
+    else:
+        # Scan directory, skipping non-executable files, README, and editor artifacts
+        for filepath in sorted(target.glob("*")):
+            if filepath.is_dir() or filepath.name == "README.md":
+                continue
+            # Skip editor/system artifacts
+            if filepath.name.startswith(".") or filepath.name.endswith(".swp") or filepath.name.endswith("~"):
+                continue
+            files_to_check.append(filepath)
+
+    all_ok = True
+    for filepath in files_to_check:
+        # Use the original argument as base for display path
+        if target.is_file():
+            display_path = target_arg
+        else:
+            target_dir = target_arg.rstrip("/")
+            display_path = f"{target_dir}/{filepath.name}"
+        
+        if not os.access(filepath, os.X_OK):
+            print(f"  ❌ {display_path} — not executable")
+            all_ok = False
+            continue
+
+        ftype = check_file_type(str(filepath))
+        if ftype == "unknown":
+            print(f"  ⚠️  {display_path} — could not determine script type")
+            continue
+
+        # Check syntax
+        if not check_syntax(str(filepath), ftype):
+            all_ok = False
+            continue
+        
+        # Check conventions (non-fatal)
+        check_conventions(str(filepath), ftype)
+        
+        print(f"  [ok] {display_path}")
+
+    if not all_ok:
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

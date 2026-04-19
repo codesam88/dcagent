@@ -1,4 +1,4 @@
-.PHONY: run test test-online test-all lint format dist install uninstall docs tags clean help
+.PHONY: run test test-scripts test-online test-all lint format dist install uninstall docs tags clean help
 
 ARCH := $(shell uname -m)
 DIST_PYZ := dist/dcagent-$(ARCH).pyz
@@ -8,7 +8,8 @@ help:
 	@echo "dcagent - Makefile targets"
 	@echo ""
 	@echo "  run              - Start the agent"
-	@echo "  test             - Run unit tests and linters"
+	@echo "  test             - Run unit tests and linters (including test-scripts)"
+	@echo "  test-scripts     - Syntax check all shell and Python scripts"
 	@echo "  test-online      - Run unit tests then integration tests (requires network)"
 	@echo "  test-all         - Alias for test-online"
 	@echo "  dist             - Build release binary (dist/dcagent-<arch>.pyz)"
@@ -24,8 +25,13 @@ help:
 run:
 	uv run dcagent serve
 
+# Syntax check all scripts
+test-scripts:
+	bash -n examples/systemd/setup.sh
+	python3 scripts/check-alert-script examples/actions
+
 # Run unit tests and linters
-test:
+test: test-scripts
 	uv run ruff check
 	uv run pytest
 	pre-commit run --all-files

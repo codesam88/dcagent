@@ -150,14 +150,24 @@ echo "alert '' CRITICAL: System overheating!" > /tmp/dcagent.pipe
 echo "status disk 95%" > /tmp/dcagent.pipe
 ```
 
-**Alert behavior:**
-- Alerts are deduplicated per category — alerts only send if the message changes
-- Empty message (or omitted) marks the category as recovered and clears the alert
-- On first recovery, dcagent sends: `<category>: recovered (was: <previous message>)`
-- Category "" (empty string) always sends immediately without deduplication
-- Categories should use dashes as word separators (e.g., `disk-usage-root`, `security-updates`, `temperature-acpi-core0`)
+**Handling of Status Inputs**
 
-Action scripts write their output to stdout; redirect to the pipe when running standalone:
+- `status` inputs are aggregated in a key-value dictionary
+- The overall bot status is created by concatenating the list of status
+  values, sorted based on their keys.
+
+**Handling of Alert Inputs**
+
+- `alert` inputs are deduplicated per category — repeating messages are ignored
+- An empty category ("") is always sent immediately, without deduplication
+- Transitioning from non-empty to empty message is called 'recovery' and causes
+  the agent to send a special message: `<category>: recovered (was: <previous message>)`
+
+Since categories are included with the alert and recovery messages, they should
+be human-readable and the message should avoid repeating information already
+contained in the category. For instance, a temperature-alarm script can use the
+individual sensor names as part of the category, thus supporting
+multiple/parallel alarm types.
 
 ```bash
 examples/actions/disk-space-alert >> /run/dcagent/dcagent.pipe
@@ -205,6 +215,7 @@ preserved (it may contain your alert and status scripts).
 ### Configuration
 
 The service reads environment variables from `$DCAGENT_CONFIG_PATH/dcagent.conf`; action scripts may also load per-script overrides from `$DCAGENT_CONFIG_PATH/conf.d/<script>.conf`.
+
 Key settings:
 
 | Variable | Default | Description |
@@ -233,7 +244,7 @@ Action scripts should write single-line commands to stdout:
 
 ```bash
 #!/usr/bin/env bash
-echo "alert ⚠️ something went wrong"
+echo 'alert my_alert something went wrong'
 echo "status my_key some value"
 ```
 
