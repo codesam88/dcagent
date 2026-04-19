@@ -28,7 +28,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-ACTION_CONF = os.environ.get("DCAGENT_ACTION_CONF", "/etc/dcagent/dcagent.conf")
+DCAGENT_CONFIG_PATH = os.environ.get("DCAGENT_CONFIG_PATH", "/etc/dcagent")
+DCAGENT_CONFIG_FILE = f"{DCAGENT_CONFIG_PATH}/dcagent.conf"
 
 
 def _load_action_conf(path: str) -> dict:
@@ -46,7 +47,7 @@ def _load_action_conf(path: str) -> dict:
 
 
 # Ensure env has DCAGENT_* vars set from action conf
-_load_action_conf(ACTION_CONF)
+_load_action_conf(DCAGENT_CONFIG_FILE)
 
 # Fallback codename constants used only when distro-info succeeds but returns
 # an empty string for a specific query (highly unlikely; treated as error).

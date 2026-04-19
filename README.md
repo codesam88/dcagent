@@ -141,10 +141,10 @@ echo "alert My disk is full" > /tmp/dcagent.pipe
 echo "status disk 95%" > /tmp/dcagent.pipe
 ```
 
-Monitoring scripts write to stdout; redirect to the pipe when running standalone:
+Action scripts write their output to stdout; redirect to the pipe when running standalone:
 
 ```bash
-examples/alerts/disk-space-alert >> /run/dcagent/dcagent.pipe
+examples/actions/disk-space-alert >> /run/dcagent/dcagent.pipe
 ```
 
 ## Deployment
@@ -188,34 +188,33 @@ preserved (it may contain your alert and status scripts).
 
 ### Configuration
 
-The service reads environment variables from `/etc/dcagent/dcagent.conf`.
+The service reads environment variables from `$DCAGENT_CONFIG_PATH/dcagent.conf`.
 Key settings:
 
 | Variable | Default | Description |
 |---|---|---|
+| `DCAGENT_CONFIG_PATH` | `/etc/dcagent` | Root config directory containing `dcagent.conf`, `actions/`, and `cron/` |
 | `DCAGENT_PIPE_PATH` | `/run/dcagent/dcagent.pipe` | Unix named pipe path |
-| `DCAGENT_CONFIG_FILE` | `/etc/dcagent/dcagent.conf` | Main config file (DCAGENT_CONFIG_DIR is derived from its directory) |
-| `DCAGENT_ACTION_INTERVAL` | `60` | How often to run action scripts when managed by dcagent (seconds) |
 | `DCAGENT_HEARTBEAT` | `60` | Heartbeat broadcast interval (seconds) |
 | `DCAGENT_LOG_LEVEL` | `info` | Log level (`debug`, `info`, `warning`, `error`) |
 
 ### Action scripts
 
-Action scripts (both alerts and status producers) live under `/etc/dcagent/actions`.
+Action scripts (both alerts and status producers) live under `$DCAGENT_CONFIG_PATH/actions`.
 Scheduling is handled externally via cron or systemd timers. The provided
 `examples/systemd/setup.sh` creates cron interval directories under
-`/etc/dcagent/cron` (hourly.d, daily.d, weekly.d, monthly.d, yearly.d) and
+`$DCAGENT_CONFIG_PATH/cron` (hourly.d, daily.d, weekly.d, monthly.d, yearly.d) and
 installs a default user crontab for the `dcagent` user that runs `run-parts`
 against those directories, redirecting output to the configured named pipe.
 To add custom execution times, edit the dcagent user's crontab with
 `crontab -e -u dcagent`.
 
-Place executable scripts in `/etc/dcagent/actions` and enable them for a
+Place executable scripts in `$DCAGENT_CONFIG_PATH/actions` and enable them for a
 given interval by creating a symlink into the desired cron interval directory,
 for example:
 
 ```bash
-ln -s /etc/dcagent/actions/security-updates-alert /etc/dcagent/cron/hourly.d/
+ln -s "$DCAGENT_CONFIG_PATH/actions/security-updates-alert" "$DCAGENT_CONFIG_PATH/cron/hourly.d/"
 ```
 
 Action scripts should write single-line commands to stdout:
@@ -226,11 +225,11 @@ echo "alert ⚠️ something went wrong"
 echo "status my_key some value"
 ```
 
-Ready-made example scripts are in `examples/alerts/` and `examples/status/`.
+Ready-made example scripts are in `examples/actions/`.
 They can also be run standalone by redirecting to the pipe:
 
 ```bash
-examples/alerts/disk-space-alert >> /run/dcagent/dcagent.pipe
+examples/actions/disk-space-alert >> /run/dcagent/dcagent.pipe
 ```
 
 ### Usage

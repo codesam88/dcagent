@@ -1,23 +1,26 @@
-# crontab for the 'dcagent' user — runs action scripts at standard intervals.
-# Install with: sudo crontab -u dcagent /etc/dcagent/dcagent.crontab
-# This file is an example and will be installed by setup.sh into the dcagent
-# user's crontab.
+# crontab for the 'dcagent' user — run action scripts at desired intervals.
+#
+# The below example entries will execute scripts in /etc/dcagent/cron/*/ at
+# respective intervals. For additional/custom execution intervals, just add
+# them to the current/active user crontab (`crontab -e -u dcagent`).
+#
+# See also: man 5 crontab
 
-# Ensure the action config is available to the scripts
-# (adjust path if you installed the config elsewhere)
-ACTION_CONF=/etc/dcagent/dcagent.conf
+# Adjust these for non-default install paths
+DCAGENT_CRON_PATH=/etc/dcagent/cron
+DCAGENT_PIPE_PATH=/run/dcagent/dcagent.pipe
 
 # Hourly: run all scripts in hourly.d
-0 * * * * ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/cron/hourly.d >> /run/dcagent/dcagent.pipe 2>/dev/null
+0 * * * * /usr/bin/run-parts $DCAGENT_CRON_PATH/hourly.d  >> $DCAGENT_PIPE_PATH 2>/dev/null
 
 # Daily: run all scripts in daily.d at 06:00
-0 6 * * * ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/cron/daily.d >> /run/dcagent/dcagent.pipe 2>/dev/null
+0 6 * * * /usr/bin/run-parts $DCAGENT_CRON_PATH/daily.d   >> $DCAGENT_PIPE_PATH 2>/dev/null
 
 # Weekly: Sundays at 06:00
-0 6 * * 0 ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/cron/weekly.d >> /run/dcagent/dcagent.pipe 2>/dev/null
+0 6 * * 0 /usr/bin/run-parts $DCAGENT_CRON_PATH/weekly.d  >> $DCAGENT_PIPE_PATH 2>/dev/null
 
 # Monthly: 1st day of month at 06:00
-0 6 1 * * ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/cron/monthly.d >> /run/dcagent/dcagent.pipe 2>/dev/null
+0 6 1 * * /usr/bin/run-parts $DCAGENT_CRON_PATH/monthly.d >> $DCAGENT_PIPE_PATH 2>/dev/null
 
 # Yearly: Jan 1st at 06:00
-0 6 1 1 * ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/cron/yearly.d >> /run/dcagent/dcagent.pipe 2>/dev/null
+0 6 1 1 * /usr/bin/run-parts $DCAGENT_CRON_PATH/yearly.d  >> $DCAGENT_PIPE_PATH 2>/dev/null

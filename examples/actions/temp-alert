@@ -30,7 +30,8 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-ACTION_CONF = os.environ.get("DCAGENT_ACTION_CONF", "/etc/dcagent/dcagent.conf")
+DCAGENT_CONFIG_PATH = os.environ.get("DCAGENT_CONFIG_PATH", "/etc/dcagent")
+DCAGENT_CONFIG_FILE = f"{DCAGENT_CONFIG_PATH}/dcagent.conf"
 
 CONF_PATH = Path("/etc/dcagent/temp.conf")
 DEFAULT_FALLBACK_THRESHOLD = 85.0
@@ -54,7 +55,7 @@ def _load_action_conf(path: str) -> dict:
 def load_conf() -> dict:
     conf = {}
     # Load action conf first (may include overrides / DCAGENT_* variables)
-    conf.update(_load_action_conf(ACTION_CONF))
+    conf.update(_load_action_conf(DCAGENT_CONFIG_FILE))
     if CONF_PATH.exists():
         for line in CONF_PATH.read_text().splitlines():
             line = line.strip()

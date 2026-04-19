@@ -17,10 +17,11 @@
 
 set -euo pipefail
 
-# Source action config (allows overriding DCAGENT_PIPE_PATH and other vars)
-ACTION_CONF="${DCAGENT_ACTION_CONF:-/etc/dcagent/dcagent.conf}"
+# Source dcagent config (provides DCAGENT_PIPE_PATH and other vars)
+DCAGENT_CONFIG_PATH="${DCAGENT_CONFIG_PATH:-/etc/dcagent}"
+DCAGENT_CONFIG_FILE="$DCAGENT_CONFIG_PATH/dcagent.conf"
 # shellcheck source=/dev/null
-[[ -f "$ACTION_CONF" ]] && source "$ACTION_CONF"
+[[ -f "$DCAGENT_CONFIG_FILE" ]] && source "$DCAGENT_CONFIG_FILE"
 
 # ── Discover pending security updates ────────────────────────────────────────
 

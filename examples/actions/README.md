@@ -8,22 +8,22 @@ single-line commands to stdout which dcagent consumes.
 Design and conventions
 
 - Single category: actions combine the former "alerts" and "status" examples.
-- Placement: install action scripts into "$DCAGENT_CONFIG_DIR/actions" (defaults to `/etc/dcagent/actions`).
+- Placement: install action scripts into `$DCAGENT_CONFIG_PATH/actions` (defaults to `/etc/dcagent/actions`).
   Enable a script for a given interval by creating a symlink from the action
-  script into the desired cron interval directory under "$DCAGENT_CONFIG_DIR/cron" (e.g.
+  script into the desired cron interval directory under `$DCAGENT_CONFIG_PATH/cron` (e.g.
   `/etc/dcagent/cron/hourly.d/`). Action scripts are executed by cron or systemd
   timers — the agent no longer invokes run-parts itself.
 
-- Configuration: scripts should source their action config before doing work.
-  By default they read `/etc/dcagent/dcagent.conf` for common variables such as
-  `DCAGENT_PIPE_PATH`. A script can override which file to source using the
-  `DCAGENT_ACTION_CONF` environment variable.
+- Configuration: scripts should start by setting `DCAGENT_CONFIG_PATH` to
+  `/etc/dcagent` by default, then source `$DCAGENT_CONFIG_PATH/dcagent.conf` for
+  common variables such as `DCAGENT_PIPE_PATH`.
 
   Example (shell):
 
-    ACTION_CONF="${DCAGENT_ACTION_CONF:-/etc/dcagent/dcagent.conf}"
+    DCAGENT_CONFIG_PATH="${DCAGENT_CONFIG_PATH:-/etc/dcagent}"
+    DCAGENT_CONFIG_FILE="$DCAGENT_CONFIG_PATH/dcagent.conf"
     # shellcheck source=/dev/null
-    [[ -f "$ACTION_CONF" ]] && source "$ACTION_CONF"
+    [[ -f "$DCAGENT_CONFIG_FILE" ]] && source "$DCAGENT_CONFIG_FILE"
 
   Example (python): the script may parse key=value lines from the file and set
   the variables into `os.environ` so code can read `os.environ['DCAGENT_PIPE_PATH']`.
@@ -35,7 +35,7 @@ Design and conventions
 - Scheduling:
   - All scheduling is managed externally (cron or systemd timers). The project
     provides a dcagent user crontab example (examples/systemd/dcagent.crontab) that
-    runs run-parts on cron interval directories under "$DCAGENT_CONFIG_DIR/cron". To add
+    runs run-parts on cron interval directories under "$DCAGENT_CONFIG_PATH/cron". To add
     custom execution times, edit the dcagent user's crontab with
     `crontab -e -u dcagent`.
   - dcagent no longer invokes run-parts internally; scripts are executed by
@@ -43,21 +43,22 @@ Design and conventions
     frequent cron schedule.
 
 - Installation and layout (setup.sh):
-  - `DCAGENT_CONFIG_DIR` (default `/etc/dcagent`) is the root for configuration
-    and action scripts. Action scripts live in `$DCAGENT_CONFIG_DIR/actions` and
-    the cron interval directories live in `$DCAGENT_CONFIG_DIR/cron`.
-  - Cron-managed interval directories under `$DCAGENT_CONFIG_DIR/cron` include:
+  - `DCAGENT_CONFIG_PATH` (default `/etc/dcagent`) is the root for configuration
+    and action scripts. `dcagent.conf` lives at `$DCAGENT_CONFIG_PATH/dcagent.conf`.
+    Action scripts live in `$DCAGENT_CONFIG_PATH/actions` and the cron interval
+    directories live in `$DCAGENT_CONFIG_PATH/cron`.
+  - Cron-managed interval directories under `$DCAGENT_CONFIG_PATH/cron` include:
       - `hourly.d/`, `daily.d/`, `weekly.d/`, `monthly.d/`, `yearly.d/`
     The example crontab runs run-parts on these directories and redirects output
     to the dcagent pipe.
   - The setup script copies the example action scripts into
-    `$DCAGENT_CONFIG_DIR/actions/` and creates the cron interval dirs. Enabling a
+    `$DCAGENT_CONFIG_PATH/actions/` and creates the cron interval dirs. Enabling a
     script for an interval is done by creating a symlink from
-    `$DCAGENT_CONFIG_DIR/actions/<script>` into the desired cron directory (`cron/hourly.d/`).
+    `$DCAGENT_CONFIG_PATH/actions/<script>` into the desired cron directory (`$DCAGENT_CONFIG_PATH/cron/hourly.d/`).
 
   Example (enable security updates hourly):
 
-    ln -s /etc/dcagent/actions/security-updates-alert /etc/dcagent/cron/hourly.d/
+    ln -s "$DCAGENT_CONFIG_PATH/actions/security-updates-alert" "$DCAGENT_CONFIG_PATH/cron/hourly.d/"
 
   - setup.sh will also install the provided crontab into the `dcagent` user's
     crontab so the hourly/daily/... jobs run automatically.
@@ -80,9 +81,9 @@ Examples in this directory:
 Installation notes
 
 - The system-wide config template is `examples/systemd/dcagent.conf` and is
-  intended to be installed to `/etc/dcagent/dcagent.conf` by the setup script.
+  intended to be installed to `$DCAGENT_CONFIG_PATH/dcagent.conf` by the setup script.
 - To enable action scripts for scheduled execution, create symlinks from the
-  action script into the desired interval directory (e.g. `/etc/dcagent/cron/hourly.d/`).
+  action script into the desired interval directory (e.g. `$DCAGENT_CONFIG_PATH/cron/hourly.d/`).
   The setup script already creates these interval directories and installs a
   default per-user crontab for the `dcagent` user.
 - For cron/systemd timer scheduling, ensure scripts are executable and either

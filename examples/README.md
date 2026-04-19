@@ -3,10 +3,10 @@
 Scripts and configuration for monitoring a Linux host and forwarding alerts
 to dcagent. Three main areas are covered:
 
-- **actions/** — scripts that detect and report problem conditions (alerts) and update bot status. Actions live in `/etc/dcagent/actions` and are executed by external schedulers (cron or systemd timers).
+- **actions/** — scripts that detect and report problem conditions (alerts) and update bot status. Actions live in `$DCAGENT_CONFIG_PATH/actions` and are executed by external schedulers (cron or systemd timers).
 - **systemd/** — service unit, config template, and install/uninstall helper for running dcagent as a systemd service
 
-Action scripts print `alert <message>` lines to stdout. They are not invoked by the agent itself; instead, use the provided per-user crontab (examples/systemd/dcagent.crontab) or install a systemd timer to run `run-parts` on the interval directories under `/etc/dcagent/cron/`. To add custom execution times, edit the dcagent user's crontab with `crontab -e -u dcagent`.
+Action scripts print `alert <message>` or `status <key> <value>` lines to stdout. They are not invoked by the agent itself; instead, use the provided per-user crontab (examples/systemd/dcagent.crontab) or install a systemd timer to run `run-parts` on the interval directories under `$DCAGENT_CONFIG_PATH/cron/`. To add custom execution times, edit the dcagent user's crontab with `crontab -e -u dcagent`.
 
 Action scripts can also be run standalone with redirection:
 
@@ -24,7 +24,7 @@ examples/actions/temp-status >> /run/dcagent/dcagent.pipe
 To enable a script for a given interval, create a symlink from the action script into the desired cron interval directory, for example:
 
 ```bash
-ln -s /etc/dcagent/actions/disk-space-alert /etc/dcagent/cron/hourly.d/
+ln -s "$DCAGENT_CONFIG_PATH/actions/disk-space-alert" "$DCAGENT_CONFIG_PATH/cron/hourly.d/"
 ```
 
 ---
@@ -42,9 +42,9 @@ point exceeding a threshold. Configure via environment variables or
 
 `disk-status` reports the usage of the most-full partition as a bot
 status update (`status 30_disk home:72%`). Configure via environment variables or
-`/etc/dcagent/disk-status.conf`. Action scripts source `/etc/dcagent/dcagent.conf`
-(or the file pointed to by the DCAGENT_ACTION_CONF environment variable) so they
-inherit the configured DCAGENT_PIPE_PATH by default:
+`/etc/dcagent/disk-status.conf`. Action scripts source
+`$DCAGENT_CONFIG_PATH/dcagent.conf` so they inherit the configured
+`DCAGENT_PIPE_PATH` by default:
 
 | Variable         | Default | Description                          |
 |------------------|---------|--------------------------------------|
