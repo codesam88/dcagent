@@ -8,7 +8,7 @@ Review the README for general intro and usage.
 
 1. Only the user is allowed to change files outside the project root directory.
 
-2. Do not commit changes automatically and never rewrite git history without explicit user request. 
+2. Do not commit changes automatically and never rewrite git history without explicit user request.
 
 3. Inside the project root directory, Agents can change or delete any files which
    are tracked in git. But ask the user before modifying files not tracked in git.
