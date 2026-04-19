@@ -30,7 +30,7 @@ wait_for_file "$AGENT_PIPE" 10
 
 echo "==> Sending test message via pipe ..."
 TOKEN="pipe-admin-test-$$-$RANDOM"
-printf 'alert %s\n' "$TOKEN" > "$AGENT_PIPE"
+printf 'alert test-admin %s\n' "$TOKEN" > "$AGENT_PIPE"
 
 echo "==> Waiting for OWNER to receive the message in ADMIN group..."
 wait_for_log "$OWNER_LOG" "$TOKEN" "$TIMEOUT"
