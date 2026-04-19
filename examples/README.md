@@ -6,7 +6,7 @@ to dcagent. Three main areas are covered:
 - **actions/** — scripts that detect and report problem conditions (alerts) and update bot status. Actions live in `$DCAGENT_CONFIG_PATH/actions`, read optional per-script config from `$DCAGENT_CONFIG_PATH/conf.d/`, and are executed by external schedulers (cron or systemd timers).
 - **systemd/** — service unit, config template, and install/uninstall helper for running dcagent as a systemd service
 
-Action scripts print `alert <message>` or `status <key> <value>` lines to stdout. They are not invoked by the agent itself; instead, use the provided per-user crontab (examples/systemd/dcagent.crontab) or install a systemd timer to run `run-parts` on the interval directories under `$DCAGENT_CONFIG_PATH/cron/`. To add custom execution times, edit the dcagent user's crontab with `crontab -e -u dcagent`.
+Action scripts print `alert <message>` or `status <key> <value>` lines to stdout. They are not invoked by the agent directly; but expected to be scheduled by the system cron or other similar means. See examples/systemd/ for an example setup.sh and crontab setup.
 
 Action scripts can also be run standalone with redirection:
 
@@ -33,7 +33,7 @@ ln -s "$DCAGENT_CONFIG_PATH/actions/disk-space-alert" "$DCAGENT_CONFIG_PATH/cron
 
 `disk-space-alert` checks partition usage and prints a line for each mount
 point exceeding a threshold. Configure via environment variables or
-`/etc/dcagent/conf.d/disk-space-alert.conf`:
+`$DCAGENT_CONFIG_PATH/conf.d/disk-space-alert.conf`:
 
 | Variable          | Default | Description                          |
 |-------------------|---------|--------------------------------------|
@@ -42,7 +42,7 @@ point exceeding a threshold. Configure via environment variables or
 
 `disk-status` reports the usage of the most-full partition as a bot
 status update (`status 30_disk home:72%`). Configure via environment variables or
-`/etc/dcagent/conf.d/disk-status.conf`. Action scripts source
+`$DCAGENT_CONFIG_PATH/conf.d/disk-status.conf`. Action scripts source
 `$DCAGENT_CONFIG_PATH/dcagent.conf` and then the per-script config so they inherit the configured
 `DCAGENT_PIPE_PATH` by default. Override the emitted status key with
 `DISK_STATUS_KEY`:
@@ -55,7 +55,7 @@ status update (`status 30_disk home:72%`). Configure via environment variables o
 
 `temp-alert` reads `sensors -j` (lm-sensors) and prints a line for each
 sensor reading that exceeds its threshold. Configure via environment variables
-or `/etc/dcagent/conf.d/temp-alert.conf`:
+or `$DCAGENT_CONFIG_PATH/conf.d/temp-alert.conf`:
 
 | Variable            | Default          | Description                                     |
 |---------------------|------------------|-------------------------------------------------|
@@ -64,7 +64,7 @@ or `/etc/dcagent/conf.d/temp-alert.conf`:
 
 `temp-status` reports the highest reading across all (or selected) sensors as a bot
 status update (`status 20_temp 65°C`). Configure via environment variables or
-`/etc/dcagent/conf.d/temp-status.conf`. Override the emitted status key with
+`$DCAGENT_CONFIG_PATH/conf.d/temp-status.conf`. Override the emitted status key with
 `TEMP_STATUS_KEY`:
 
 | Variable        | Default | Description                                        |
@@ -76,7 +76,7 @@ status update (`status 20_temp 65°C`). Configure via environment variables or
 
 `systemd-failed-alert` reports any unit in the `failed` state via
 `systemctl --failed`. Optionally restrict to a specific set of services.
-Configure via environment variables or `/etc/dcagent/conf.d/systemd-failed-alert.conf`:
+Configure via environment variables or `$DCAGENT_CONFIG_PATH/conf.d/systemd-failed-alert.conf`:
 
 | Variable         | Default | Description                                             |
 |------------------|---------|---------------------------------------------------------|
@@ -87,7 +87,7 @@ Configure via environment variables or `/etc/dcagent/conf.d/systemd-failed-alert
 `security-updates-alert` checks for pending security updates using
 `apt-get -s dist-upgrade` and reports them as a single alert plus a status
 entry (`status 10_updates`). Configure via environment variables or
-`/etc/dcagent/conf.d/security-updates-alert.conf`. Uses the existing apt cache —
+`$DCAGENT_CONFIG_PATH/conf.d/security-updates-alert.conf`. Uses the existing apt cache —
 run `apt-get update` beforehand (e.g. in the same cron job) to keep results current.
 Override the emitted status key with `SECURITY_UPDATES_ALERT_STATUS_KEY`.
 
@@ -98,7 +98,7 @@ as a bot status entry (`status 01_release Ubuntu noble [lts]`). Also sends an al
 if a newer stable or LTS release is available. Supports Debian and Ubuntu;
 uses the `distro-info` package when installed and will surface a helpful
 error status if the tool is missing. Configure via environment variables or
-`/etc/dcagent/conf.d/distro-info.conf`. Override the emitted status key with
+`$DCAGENT_CONFIG_PATH/conf.d/distro-info.conf`. Override the emitted status key with
 `DISTRO_INFO_STATUS_KEY`.
 
 ---

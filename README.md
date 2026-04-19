@@ -200,14 +200,10 @@ Key settings:
 
 ### Action scripts
 
-Action scripts (both alerts and status producers) live under `$DCAGENT_CONFIG_PATH/actions` and read optional per-script config from `$DCAGENT_CONFIG_PATH/conf.d/`.
-Scheduling is handled externally via cron or systemd timers. The provided
-`examples/systemd/setup.sh` creates cron interval directories under
-`$DCAGENT_CONFIG_PATH/cron` (hourly.d, daily.d, weekly.d, monthly.d, yearly.d) and
-installs a default user crontab for the `dcagent` user that runs `run-parts`
-against those directories, redirecting output to the configured named pipe.
-To add custom execution times, edit the dcagent user's crontab with
-`crontab -e -u dcagent`.
+Action scripts live under `$DCAGENT_CONFIG_PATH/actions` and can read optional per-script config from `$DCAGENT_CONFIG_PATH/conf.d/`.
+`dcagent-run-actions` batch-runs the dcagent user's crontab and is used by the service to refresh alerts and status on startup.
+
+See `examples/README.md` and `examples/actions/README.md` for the scheduling layout and helper details.
 
 Place executable scripts in `$DCAGENT_CONFIG_PATH/actions` and enable them for a
 given interval by creating a symlink into the desired cron interval directory,

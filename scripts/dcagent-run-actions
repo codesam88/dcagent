@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""Batch-run the dcagent user crontab once, executing each cron command in order."""
+
+from __future__ import annotations
+
+import argparse
+import getpass
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+
+CRONTAB_BIN = os.environ.get("CRONTAB_BIN") or shutil.which("crontab")
+
+
+def _split_cron_command(command: str) -> tuple[str, str]:
+    """Return (command, stdin) after applying cron % handling."""
+    buf: list[str] = []
+    stdin: list[str] = []
+    target = buf
+    escaped = False
+    for ch in command:
+        if escaped:
+            target.append(ch)
+            escaped = False
+            continue
+        if ch == "\\":
+            escaped = True
+            continue
+        if ch == "%":
+            if target is buf:
+                target = stdin
+                continue
+            target.append("\n")
+            continue
+        target.append(ch)
+    if escaped:
+        target.append("\\")
+    return "".join(buf).rstrip(), "".join(stdin)
+
+
+def _list_crontab() -> list[str]:
+    if not CRONTAB_BIN:
+        print("dcagent-run-actions: crontab binary not found", file=sys.stderr)
+        return []
+    result = subprocess.run([CRONTAB_BIN, "-l"], capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        stderr = result.stderr.strip()
+        if not stderr:
+            return []
+        if "no crontab for" in stderr.lower():
+            return []
+        print(f"dcagent-run-actions: crontab -l failed: {stderr}", file=sys.stderr)
+        return []
+    return result.stdout.splitlines()
+
+
+def _log(message: str, args: argparse.Namespace) -> None:
+    if args.verbose or args.dry_run:
+        print(message, file=sys.stderr)
+
+
+def _run_command(command: str, env: dict[str, str], args: argparse.Namespace) -> None:
+    cmd, stdin = _split_cron_command(command)
+    if not cmd:
+        return
+    _log(f"dcagent-run-actions: {'would run' if args.dry_run else 'running'}: {cmd}", args)
+    if args.dry_run:
+        if stdin:
+            _log(f"dcagent-run-actions: stdin: {stdin!r}", args)
+        return
+    subprocess.run(
+        cmd,
+        input=stdin or None,
+        shell=True,
+        check=False,
+        env=env,
+        executable=env.get("SHELL", "/bin/bash"),
+        text=True,
+    )
+
+
+def _parse_args(argv: list[str] | None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dry-run", action="store_true", help="list commands without executing them")
+    parser.add_argument("--verbose", "-v", action="store_true", help="print commands before executing them")
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(argv)
+    current_user = getpass.getuser()
+    if os.geteuid() == 0:
+        print("dcagent-run-actions: refuse to run as root; run it as the dcagent user", file=sys.stderr)
+        return 1
+    if current_user != "dcagent":
+        print(
+            f"dcagent-run-actions: warning: running as {current_user!r}; expected 'dcagent'",
+            file=sys.stderr,
+        )
+
+    env = os.environ.copy()
+    lines = _list_crontab()
+
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        env_match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$", line)
+        if env_match and not line[0].isdigit() and not line.startswith("@"):
+            key, value = env_match.groups()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+                value = value[1:-1]
+            env[key.strip()] = value
+            _log(f"dcagent-run-actions: env {key.strip()}={value}", args)
+            continue
+
+        if line.startswith("@"):
+            parts = line.split(None, 1)
+            if len(parts) == 2:
+                _run_command(parts[1], env, args)
+            continue
+
+        parts = line.split(None, 5)
+        if len(parts) < 6:
+            print(f"dcagent-run-actions: skipping unrecognized line: {raw}", file=sys.stderr)
+            continue
+
+        _run_command(parts[5], env, args)
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -43,9 +43,6 @@ Design and conventions
     runs run-parts on cron interval directories under "$DCAGENT_CONFIG_PATH/cron". To add
     custom execution times, edit the dcagent user's crontab with
     `crontab -e -u dcagent`.
-  - dcagent no longer invokes run-parts internally; scripts are executed by
-    cron or timers. For short-interval checks prefer systemd timers or a
-    frequent cron schedule.
 
 - Installation and layout (setup.sh):
   - `DCAGENT_CONFIG_PATH` (default `/etc/dcagent`) is the root for configuration

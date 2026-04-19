@@ -12,6 +12,7 @@ set -euo pipefail
 CODEBERG_API="https://codeberg.org/api/v1/repos/codesam/dcagent/releases?limit=1"
 SCRIPTDIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL_BIN=/usr/local/bin/dcagent
+RUN_ACTIONS_BIN=/usr/local/bin/dcagent-run-actions
 SERVICE_DEST=/etc/systemd/system/dcagent.service
 CONF_DEST=/etc/dcagent/dcagent.conf
 DCAGENT_USER=dcagent
@@ -48,6 +49,7 @@ if $UNINSTALL; then
     echo
     echo "Installed files and accounts:"
     [[ -f "$INSTALL_BIN" ]]  && echo "  $INSTALL_BIN"
+    [[ -f "$RUN_ACTIONS_BIN" ]]   && echo "  $RUN_ACTIONS_BIN"
     [[ -f "$SERVICE_DEST" ]] && echo "  $SERVICE_DEST"
     [[ -d "$DCAGENT_CONF_DIR" ]] && echo "  $DCAGENT_CONF_DIR  (not removed — may contain your scripts)"
     echo
@@ -64,6 +66,7 @@ if $UNINSTALL; then
     [[ -f "$SERVICE_DEST" ]] && run rm "$SERVICE_DEST"
     run systemctl daemon-reload
     [[ -f "$INSTALL_BIN" ]]  && run rm "$INSTALL_BIN"
+    [[ -f "$RUN_ACTIONS_BIN" ]]   && run rm "$RUN_ACTIONS_BIN"
     id "$DCAGENT_USER" &>/dev/null && run userdel -r "$DCAGENT_USER"
     exit 0
 fi
@@ -76,6 +79,7 @@ echo "dcagent install"
 echo
 echo "Files that will be created or modified:"
 echo "  $INSTALL_BIN"
+echo "  $RUN_ACTIONS_BIN"
 echo "  $SERVICE_DEST"
 if [[ -f "$CONF_DEST" ]]; then
     echo "  $CONF_DEST  (exists, will not be overwritten)"
@@ -91,6 +95,7 @@ else
     echo "  $N. download and install latest dcagent-${ARCH}.pyz to $INSTALL_BIN"; (( N++ ))
 fi
 echo "  $N. install systemd unit to $SERVICE_DEST"; (( N++ ))
+echo "  $N. install helper to run all actions to $RUN_ACTIONS_BIN"; (( N++ ))
 echo "  $N. install config file to $CONF_DEST (unless exists)"; (( N++ ))
 echo "  $N. create per-script config dir $DCAGENT_CONF_DIR/conf.d"; (( N++ ))
 echo "  $N. create system user '$DCAGENT_USER' (unless exists)"; (( N++ ))
@@ -115,6 +120,7 @@ if [[ -z "$PYZ" ]]; then
 fi
 
 run install -m 755 "$PYZ" "$INSTALL_BIN"
+run install -m 755 "$SCRIPTDIR/../../scripts/dcagent-run-actions" "$RUN_ACTIONS_BIN"
 
 if ! id "$DCAGENT_USER" &>/dev/null; then
     run useradd --system --user-group --home-dir "$DCAGENT_HOME" --create-home \

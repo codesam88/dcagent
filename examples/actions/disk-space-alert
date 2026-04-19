@@ -4,7 +4,7 @@
 # usage threshold. Pipe the output to dcagent:
 #   disk-space-alert >> /run/dcagent/dcagent.pipe
 #
-# Configuration (environment variables or /etc/dcagent/conf.d/disk-space-alert.conf):
+# Configuration (environment variables or $DCAGENT_CONFIG_PATH/conf.d/disk-space-alert.conf):
 #
 #   ALERT_THRESHOLD   Usage percentage that triggers an alert (0-100).
 #                     Default: 90

@@ -5,7 +5,7 @@
 #   systemd-failed-alert                 # check all units
 #   systemd-failed-alert >> /run/dcagent/dcagent.pipe
 #
-# Configuration (environment variables or /etc/dcagent/conf.d/systemd-failed-alert.conf):
+# Configuration (environment variables or $DCAGENT_CONFIG_PATH/conf.d/systemd-failed-alert.conf):
 #
 #   WATCH_SERVICES   Space-separated list of service names to watch.
 #                    If set, only these services are checked.

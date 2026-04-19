@@ -11,6 +11,7 @@ EnvironmentFile=-/etc/dcagent/dcagent.conf
 WorkingDirectory=/var/lib/dcagent
 RuntimeDirectory=dcagent
 ExecStart=/usr/local/bin/dcagent serve
+ExecStartPost=/usr/local/bin/dcagent-run-actions
 Restart=on-failure
 RestartSec=10
 

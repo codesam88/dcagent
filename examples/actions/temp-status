@@ -7,7 +7,7 @@ Requires lm-sensors ('sensors' command).
 Pipe the output to dcagent:
   temp-status >> /run/dcagent/dcagent.pipe
 
-Configuration (environment variables or /etc/dcagent/conf.d/temp-status.conf, as KEY=VALUE):
+Configuration (environment variables or $DCAGENT_CONFIG_PATH/conf.d/temp-status.conf, as KEY=VALUE):
 
   REPORT_CHIPS        Space-separated list of chip name prefixes to include.
                       Default: all chips reported by sensors.

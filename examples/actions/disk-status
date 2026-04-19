@@ -5,7 +5,7 @@
 # Pipe the output to dcagent:
 #   disk-status >> /run/dcagent/dcagent.pipe
 #
-# Configuration (environment variables or /etc/dcagent/conf.d/disk-status.conf):
+# Configuration (environment variables or $DCAGENT_CONFIG_PATH/conf.d/disk-status.conf):
 #
 #   MONITOR_MOUNTS    Space-separated list of mount points to check.
 #                     Default: all non-virtual mounted filesystems
