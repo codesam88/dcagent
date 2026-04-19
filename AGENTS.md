@@ -13,8 +13,8 @@ Review the README for general intro and usage.
 3. Inside the project root directory, Agents can change or delete any files which
    are tracked in git. But ask the user before modifying files not tracked in git.
 
-4. Files may be changed by the user. When edits fail, try to re-read the file
-   for possible manual changes. Be careful not to revert such manual changes.
+4. Files may be changed by the user. If a file was edited manually, re-read it
+   and consider the change as intended correction. Avoid reverting user changes.
 
 5. After any significant modifications, run tests (`make test`)
 
@@ -22,6 +22,10 @@ Review the README for general intro and usage.
 
 7. Prior to commit, stop to consider if any supporting documentation,
    examples, scripts may still need to be updated.
+
+8. When generating documentation, git commit messages etc, be careful to stick
+   to the main points. Do not generate detailed examples unless requested. Do
+   not duplicate user documentation into code or commit messages.
 
 
 ## Testing
