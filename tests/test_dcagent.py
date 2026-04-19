@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from dcagent.agent import _pipe_do_alert
+from dcagent.agent import _handle_alert_state, _pipe_do_alert
 from dcagent.bot import (
     APP_NAME,
     AgentError,
@@ -109,22 +109,93 @@ def test_parser_log_file_default():
 # ---------------------------------------------------------------------------
 
 
+# _handle_alert_state
+# ---------------------------------------------------------------------------
+
+
+def test_handle_alert_state_immediate_category():
+    """Category "" always sends, bypasses deduplication."""
+    alert_map = {}
+    result = _handle_alert_state("", "urgent alert", alert_map)
+    assert result == "urgent alert"
+
+    # Second call with same message should still send
+    result = _handle_alert_state("", "urgent alert", alert_map)
+    assert result == "urgent alert"
+
+
+def test_handle_alert_state_first_alert():
+    """First non-empty message should be sent."""
+    alert_map = {}
+    result = _handle_alert_state("disk", "95% full", alert_map)
+    assert result == "disk: 95% full"
+
+
+def test_handle_alert_state_no_change():
+    """Same message should be suppressed."""
+    alert_map = {"disk": "95% full"}
+    result = _handle_alert_state("disk", "95% full", alert_map)
+    assert result is None
+
+
+def test_handle_alert_state_message_change():
+    """Different message should be sent."""
+    alert_map = {"disk": "95% full"}
+    result = _handle_alert_state("disk", "98% full", alert_map)
+    assert result == "disk: 98% full"
+
+
+def test_handle_alert_state_recovery():
+    """Empty message after error should send recovery."""
+    alert_map = {"disk": "95% full"}
+    result = _handle_alert_state("disk", "", alert_map)
+    assert result == "disk: recovered (was: 95% full)"
+
+
+def test_handle_alert_state_recovery_already_sent():
+    """Empty message when already empty should be suppressed."""
+    alert_map = {"disk": ""}
+    result = _handle_alert_state("disk", "", alert_map)
+    assert result is None
+
+
+def test_handle_alert_state_first_empty():
+    """First empty message should be suppressed."""
+    alert_map = {}
+    result = _handle_alert_state("disk", "", alert_map)
+    assert result is None
+
+
+def test_handle_alert_state_alert_after_recovery():
+    """Alert after recovery should send normally."""
+    alert_map = {"disk": ""}
+    result = _handle_alert_state("disk", "92% full", alert_map)
+    assert result == "disk: 92% full"
+
+
+# _pipe_do_alert
+# ---------------------------------------------------------------------------
+
+
 def test_pipe_do_alert_sends_to_alert_chats():
     rpc = MagicMock()
     rpc.get_config.return_value = "42"
-    _pipe_do_alert("hello", accid=1, rpc=rpc)
+    alert_map = {}
+    _pipe_do_alert("disk 95% full", accid=1, rpc=rpc, alert_map=alert_map)
     rpc.send_msg.assert_called_once()
     call_args = rpc.send_msg.call_args
     assert call_args[0][0] == 1  # accid
     assert call_args[0][1] == 42  # chat_id
-    assert call_args[0][2].text == "hello"
+    assert call_args[0][2].text == "disk: 95% full"
+    assert alert_map["disk"] == "95% full"
 
 
 def test_pipe_do_alert_no_alert_chats(caplog):
     rpc = MagicMock()
     rpc.get_config.return_value = None
+    alert_map = {}
     with caplog.at_level(logging.WARNING, logger=APP_NAME):
-        _pipe_do_alert("hi", accid=1, rpc=rpc)
+        _pipe_do_alert("disk 95% full", accid=1, rpc=rpc, alert_map=alert_map)
     assert "no alert chats" in caplog.text
     rpc.send_msg.assert_not_called()
 
@@ -132,8 +203,31 @@ def test_pipe_do_alert_no_alert_chats(caplog):
 def test_pipe_do_alert_multiple_chats():
     rpc = MagicMock()
     rpc.get_config.return_value = "5,7,9"
-    _pipe_do_alert("hi", accid=1, rpc=rpc)
+    alert_map = {}
+    _pipe_do_alert("disk 95% full", accid=1, rpc=rpc, alert_map=alert_map)
     assert rpc.send_msg.call_count == 3
+
+
+def test_pipe_do_alert_suppressed_no_change():
+    """Alert with no state change should be suppressed."""
+    rpc = MagicMock()
+    rpc.get_config.return_value = "42"
+    alert_map = {"disk": "95% full"}
+    _pipe_do_alert("disk 95% full", accid=1, rpc=rpc, alert_map=alert_map)
+    rpc.send_msg.assert_not_called()
+
+
+def test_pipe_do_alert_recovery(caplog):
+    """Alert with empty message should send recovery."""
+    rpc = MagicMock()
+    rpc.get_config.return_value = "42"
+    alert_map = {"disk": "95% full"}
+    with caplog.at_level(logging.DEBUG, logger=APP_NAME):
+        _pipe_do_alert("disk ", accid=1, rpc=rpc, alert_map=alert_map)
+    rpc.send_msg.assert_called_once()
+    call_args = rpc.send_msg.call_args
+    assert "recovered" in call_args[0][2].text
+    assert alert_map["disk"] == ""
 
 
 # ---------------------------------------------------------------------------

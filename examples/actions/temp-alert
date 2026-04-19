@@ -68,7 +68,7 @@ def read_sensors() -> dict:
 
 
 def check_temps(data: dict, threshold_override: float | None, ignore_prefixes: list[str]) -> None:
-
+    """Check temperatures and emit per-sensor alerts that can be cleared individually."""
     for chip, sensors in data.items():
         if not isinstance(sensors, dict):
             continue
@@ -90,8 +90,16 @@ def check_temps(data: dict, threshold_override: float | None, ignore_prefixes: l
                         or vals.get(f"{prefix}_crit")
                         or DEFAULT_FALLBACK_THRESHOLD
                     )
+                # Create a unique category per sensor: temperature-<chip>-<label>
+                # Sanitize label/chip for use as category (replace spaces/special chars with -)
+                chip_safe = chip.replace(" ", "-").lower()
+                label_safe = label.replace(" ", "-").lower()
+                category = f"temperature-{chip_safe}-{label_safe}"
+
                 if current >= threshold:
-                    print(f"alert 🌡️ {chip} {label}: {current:.1f}°C >= {threshold:.1f}°C")
+                    print(f"alert {category} {chip} {label}: {current:.1f}C >= {threshold:.1f}C")
+                else:
+                    print(f"alert {category}")
 
 
 def main() -> None:

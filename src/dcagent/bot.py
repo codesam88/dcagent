@@ -20,8 +20,8 @@ Subcommands:
 Pipe input format:
     <command> [args...]
 
-    alert <message>         forward message to all alert chats
-    status <key> <msg>      update status element key to msg
+    alert <category> [message]   update alert state; only sends if state changed or category=""
+    status <key> <msg>           update status element key to msg
 """
 
 import logging

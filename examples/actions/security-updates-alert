@@ -2,7 +2,7 @@
 #
 # security-updates-alert — report pending security updates via apt.
 # Sends an alert listing all security packages and a status summary.
-#   alert 🔒 N security update(s) available: pkg1, pkg2, ...
+#   alert security-updates N security update(s) available: pkg1, pkg2, ...
 #   status ${SECURITY_UPDATES_ALERT_STATUS_KEY:-10_updates} N security update(s) pending   (or: up to date)
 #
 # Pipe the output to dcagent:
@@ -45,10 +45,11 @@ count="${#pkgs[@]}"
 
 if (( count > 0 )); then
     pkg_list="${pkgs[*]}"
-    echo "alert 🔒 ${count} security update(s) available: ${pkg_list// /, }"
+    echo "alert security-updates ${count} security update(s) available: ${pkg_list// /, }"
     status_key="${SECURITY_UPDATES_ALERT_STATUS_KEY:-10_updates}"
     echo "status $status_key need-patches"
 else
+    echo "alert security-updates"
     status_key="${SECURITY_UPDATES_ALERT_STATUS_KEY:-10_updates}"
     echo "status $status_key up-to-date"
 fi

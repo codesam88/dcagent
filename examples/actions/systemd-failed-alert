@@ -28,12 +28,14 @@ if [[ -n "$WATCH_SERVICES" ]]; then
     for svc in $WATCH_SERVICES; do
         state=$(systemctl is-failed "$svc" 2>/dev/null)
         if [[ "$state" == "failed" ]]; then
-            echo "alert 🔴 systemd service failed: $svc"
+            echo "alert systemd-failed-$svc $svc failed"
+        else
+            echo "alert systemd-failed-$svc"
         fi
     done
 else
     while read -r unit _load _active _sub _desc; do
         [[ -z "$unit" ]] && continue
-        echo "alert 🔴 systemd service failed: $unit"
+        echo "alert systemd-failed-$unit $unit failed"
     done < <(systemctl --failed --no-legend --plain 2>/dev/null)
 fi

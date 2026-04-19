@@ -137,9 +137,25 @@ uv run dcagent serve --pipe-path /tmp/dcagent.pipe
 Then send commands:
 
 ```bash
-echo "alert My disk is full" > /tmp/dcagent.pipe
+# Alert with category and message (sent if state changes)
+echo "alert disk-usage-root disk 95% full" > /tmp/dcagent.pipe
+
+# Clear an alert (sends recovery message on first clear)
+echo "alert disk-usage-root" > /tmp/dcagent.pipe
+
+# Immediate alert without deduplication (category "")
+echo "alert '' CRITICAL: System overheating!" > /tmp/dcagent.pipe
+
+# Update status
 echo "status disk 95%" > /tmp/dcagent.pipe
 ```
+
+**Alert behavior:**
+- Alerts are deduplicated per category — alerts only send if the message changes
+- Empty message (or omitted) marks the category as recovered and clears the alert
+- On first recovery, dcagent sends: `<category>: recovered (was: <previous message>)`
+- Category "" (empty string) always sends immediately without deduplication
+- Categories should use dashes as word separators (e.g., `disk-usage-root`, `security-updates`, `temperature-acpi-core0`)
 
 Action scripts write their output to stdout; redirect to the pipe when running standalone:
 

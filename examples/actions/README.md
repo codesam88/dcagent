@@ -33,7 +33,12 @@ Design and conventions
   the variables into `os.environ` so code can read `os.environ['DCAGENT_PIPE_PATH']`.
 
 - Output format:
-  - Alerts: `alert <message>` (dcagent forwards to alert chats)
+  - Alerts: `alert <category> [message]` (dcagent tracks state per category and forwards to alert chats)
+    - Category should use dashes as word separators (e.g., `disk-usage`, `security-updates`, `temperature-<chip>-<label>`)
+    - If `<message>` is empty or omitted, dcagent marks the category as "recovered" (normal state)
+    - If `<message>` changes, dcagent forwards the new message as `<category>: <message>`
+    - If category is "" (empty string), the message is always sent without a prefix and bypasses deduplication
+    - On first transition from error to recovery, dcagent sends: `<category>: recovered (was: <previous message>)`
   - Status: `status <key> <value>` (dcagent updates the in-chat status map)
     - Status keys are configurable via a script-specific `*_STATUS_KEY` env var.
 
