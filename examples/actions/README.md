@@ -32,12 +32,16 @@ Design and conventions
   - Status: `status <key> <value>` (dcagent updates the in-chat status map)
 
 - Scheduling:
-  - Short-interval checks (e.g. every 30s-5min) can continue to be run by
-    dcagent using run-parts and the configured `DCAGENT_ACTION_DIR`/interval.
-  - Infrequent checks (hourly/daily/weekly/monthly/yearly) are supported via
-    a user crontab for the `dcagent` user included in `examples/systemd/`.
-    The provided crontab runs run-parts against these interval directories
-    and redirects the combined stdout of the scripts to the dcagent pipe.
+  - All scheduling is managed externally (cron or systemd timers). The project
+    provides:
+      - a dcagent user crontab example (examples/systemd/dcagent.crontab) that
+        runs run-parts on cron interval directories under DCAGENT_CRON_DIR.
+      - a cron.d-style example (examples/systemd/dcagent.cron.d) which can be
+        copied into DCAGENT_CRON_DIR/cron.d/ or merged into /etc/cron.d/ for
+        system-level scheduling.
+  - dcagent no longer invokes run-parts internally; scripts are executed by
+    cron or timers. For short-interval checks prefer systemd timers or a
+    frequent cron schedule.
 
 - Installation and layout (setup.sh):
   - `DCAGENT_CONFIG_DIR` (default `/etc/dcagent`) is the root for configuration

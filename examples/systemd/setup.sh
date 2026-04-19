@@ -134,7 +134,8 @@ run install -m 755 -d \
     "$DCAGENT_CONF_DIR/cron/daily.d" \
     "$DCAGENT_CONF_DIR/cron/weekly.d" \
     "$DCAGENT_CONF_DIR/cron/monthly.d" \
-    "$DCAGENT_CONF_DIR/cron/yearly.d"
+    "$DCAGENT_CONF_DIR/cron/yearly.d" \
+    "$DCAGENT_CONF_DIR/cron/cron.d"
 
 # Copy example action scripts into actions/ (do not overwrite existing files)
 if [[ -d "$SCRIPTDIR/../examples/actions" ]]; then
@@ -145,6 +146,13 @@ if [[ -d "$SCRIPTDIR/../examples/actions" ]]; then
             run install -m 755 "$f" "$dest"
         fi
     done
+fi
+
+# Copy example cron.d file into cron/cron.d
+if [[ -f "$SCRIPTDIR/dcagent.cron.d" ]]; then
+    if [[ ! -e "$DCAGENT_CONF_DIR/cron/cron.d/dcagent" ]]; then
+        run install -m 644 "$SCRIPTDIR/dcagent.cron.d" "$DCAGENT_CONF_DIR/cron/cron.d/dcagent"
+    fi
 fi
 
 # Install example crontab into dcagent user's crontab
