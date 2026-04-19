@@ -47,13 +47,10 @@ fi
 
 while read -r pct mount; do
     pct="${pct%%%}"
-    # Sanitize mount point for use in category (replace / with -)
-    mount_cat="${mount//\//-}"
-    mount_cat="${mount_cat#-}"  # Remove leading dash
-    mount_cat="disk-usage-$mount_cat"
+    mount_cat="disk-usage-$mount"
 
     if (( pct >= ALERT_THRESHOLD )); then
-        echo "alert $mount_cat $mount is ${pct}% full (threshold: ${ALERT_THRESHOLD}%)"
+        echo "alert $mount_cat ${pct}% full (threshold: ${ALERT_THRESHOLD}%)"
     else
         echo "alert $mount_cat"
     fi

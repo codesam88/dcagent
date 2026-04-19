@@ -97,7 +97,7 @@ def check_temps(data: dict, threshold_override: float | None, ignore_prefixes: l
                 category = f"temperature-{chip_safe}-{label_safe}"
 
                 if current >= threshold:
-                    print(f"alert {category} {chip} {label}: {current:.1f}C >= {threshold:.1f}C")
+                    print(f"alert {category} {current:.1f}C >= {threshold:.1f}C")
                 else:
                     print(f"alert {category}")
 
