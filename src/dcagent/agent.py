@@ -168,15 +168,75 @@ def _on_new_message(bot: Bot, accid: int, event) -> None:
 def _on_help(bot: Bot, accid: int, event) -> None:
     msg = event.msg
     bot_name = bot.rpc.get_config(accid, "displayname") or APP_NAME
-    bot.rpc.send_msg(
-        accid,
-        msg.chat_id,
-        MsgData(text=f"👋 Hi! I am {bot_name}.\n\nCommands:\n  /help  – show this\n  /ping  – check I'm alive"),
+    help_text = (
+        f"👋 Hi! I am {bot_name}.\n\n"
+        "Commands:\n"
+        "  /help   – show this\n"
+        "  /ping   – check I'm alive\n"
+        "  /alert  – manage alert chat (admin only)\n"
+        "  /admin  – manage admin chat (admin only)"
     )
+    bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=help_text))
 
 
 def _on_ping(bot: Bot, accid: int, event) -> None:
     bot.rpc.send_msg(accid, event.msg.chat_id, MsgData(text="Pong! 🏓"))
+
+
+def _on_alert(bot: Bot, accid: int, event) -> None:
+    msg = event.msg
+    # Check if sender is in admin chat
+    if msg.chat_id not in _bot._get_admin_chats(bot.rpc, accid):
+        bot.rpc.send_msg(accid, msg.chat_id, MsgData(text="❌ Only admins can use /alert"))
+        return
+
+    # Extract invite from message text if provided
+    # Format: "/alert [<invite>]"
+    parts = msg.text.strip().split(None, 1)
+    invite = parts[1] if len(parts) > 1 else None
+
+    try:
+        if not invite:
+            # Generate and send alert chat invite
+            chatid = _bot._get_or_create_alert_chat(bot.rpc, accid)
+            qr_code = bot.rpc.get_chat_securejoin_qr_code(accid, chatid)
+            bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=f"Alert chat invite:\n{qr_code}"))
+        else:
+            # Join alert chat from invite
+            chat_id = _bot._securejoin(bot.rpc, accid, invite)
+            _bot._add_alert_chat(bot.rpc, accid, chat_id)
+            bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=f"✓ Joined alert chat (chat_id={chat_id})"))
+    except Exception as e:
+        log.exception("Error handling /alert command")
+        bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=f"❌ Error: {e}"))
+
+
+def _on_admin(bot: Bot, accid: int, event) -> None:
+    msg = event.msg
+    # Check if sender is in admin chat
+    if msg.chat_id not in _bot._get_admin_chats(bot.rpc, accid):
+        bot.rpc.send_msg(accid, msg.chat_id, MsgData(text="❌ Only admins can use /admin"))
+        return
+
+    # Extract invite from message text if provided
+    # Format: "/admin [<invite>]"
+    parts = msg.text.strip().split(None, 1)
+    invite = parts[1] if len(parts) > 1 else None
+
+    try:
+        if not invite:
+            # Generate and send admin chat invite
+            chatid = _bot._get_or_create_admin_chat(bot.rpc, accid)
+            qr_code = bot.rpc.get_chat_securejoin_qr_code(accid, chatid)
+            bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=f"Admin chat invite:\n{qr_code}"))
+        else:
+            # Join admin chat from invite
+            chat_id = _bot._securejoin(bot.rpc, accid, invite)
+            _bot._add_admin_chat(bot.rpc, accid, chat_id)
+            bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=f"✓ Joined admin chat (chat_id={chat_id})"))
+    except Exception as e:
+        log.exception("Error handling /admin command")
+        bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=f"❌ Error: {e}"))
 
 
 # ---------------------------------------------------------------------------
@@ -205,6 +265,8 @@ def run_bot(
         (_on_new_message, events.NewMessage(is_bot=None)),
         (_on_help, events.NewMessage(command="/help")),
         (_on_ping, events.NewMessage(command="/ping")),
+        (_on_alert, events.NewMessage(command="/alert")),
+        (_on_admin, events.NewMessage(command="/admin")),
         (hb_state.make_handler(), events.NewMessage(is_bot=None)),
     ]
     bot = Bot(rpc, hooks, logger=log)
