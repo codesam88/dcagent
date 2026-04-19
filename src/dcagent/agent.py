@@ -174,7 +174,9 @@ def _on_help(bot: Bot, accid: int, event) -> None:
         "  /help   – show this\n"
         "  /ping   – check I'm alive\n"
         "  /alert  – manage alert chat (admin only)\n"
-        "  /admin  – manage admin chat (admin only)"
+        "  /admin  – manage admin chat (admin only)\n"
+        "  /chats  – list managed chats (admin only)\n"
+        "  /leave  – leave a chat (admin only)"
     )
     bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=help_text))
 
@@ -239,6 +241,71 @@ def _on_admin(bot: Bot, accid: int, event) -> None:
         bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=f"❌ Error: {e}"))
 
 
+def _on_chats(bot: Bot, accid: int, event) -> None:
+    msg = event.msg
+    # Check if sender is in admin chat
+    if msg.chat_id not in _bot._get_admin_chats(bot.rpc, accid):
+        bot.rpc.send_msg(accid, msg.chat_id, MsgData(text="❌ Only admins can use /chats"))
+        return
+
+    admin_chats = _bot._get_admin_chats(bot.rpc, accid)
+    alert_chats = _bot._get_alert_chats(bot.rpc, accid)
+
+    lines = ["Managed chats:"]
+    if admin_chats:
+        lines.append("Admin:")
+        for cid in admin_chats:
+            lines.append(f"  {cid}")
+    if alert_chats:
+        lines.append("Alert:")
+        for cid in alert_chats:
+            lines.append(f"  {cid}")
+    if not admin_chats and not alert_chats:
+        lines.append("(none)")
+
+    bot.rpc.send_msg(accid, msg.chat_id, MsgData(text="\n".join(lines)))
+
+
+def _on_leave(bot: Bot, accid: int, event) -> None:
+    msg = event.msg
+    # Check if sender is in admin chat
+    if msg.chat_id not in _bot._get_admin_chats(bot.rpc, accid):
+        bot.rpc.send_msg(accid, msg.chat_id, MsgData(text="❌ Only admins can use /leave"))
+        return
+
+    # Extract chat_id from message text
+    # Format: "/leave <chatid>"
+    parts = msg.text.strip().split(None, 1)
+    if len(parts) < 2:
+        bot.rpc.send_msg(accid, msg.chat_id, MsgData(text="Usage: /leave <chatid>"))
+        return
+
+    try:
+        chat_id = int(parts[1])
+    except ValueError:
+        bot.rpc.send_msg(accid, msg.chat_id, MsgData(text="❌ Invalid chat ID"))
+        return
+
+    try:
+        # Remove from admin/alert lists
+        admin_chats = _bot._get_admin_chats(bot.rpc, accid)
+        alert_chats = _bot._get_alert_chats(bot.rpc, accid)
+
+        if chat_id in admin_chats:
+            admin_chats.remove(chat_id)
+            bot.rpc.set_config(accid, "ui.admin_chats", ",".join(str(c) for c in admin_chats))
+        if chat_id in alert_chats:
+            alert_chats.remove(chat_id)
+            bot.rpc.set_config(accid, "ui.alert_chats", ",".join(str(c) for c in alert_chats))
+
+        # Leave the chat
+        bot.rpc.remove_contact_from_chat(accid, chat_id, 1)  # 1 is self contact id
+        bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=f"✓ Left chat {chat_id}"))
+    except Exception as e:
+        log.exception("Error handling /leave command")
+        bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=f"❌ Error: {e}"))
+
+
 # ---------------------------------------------------------------------------
 # Full run_bot — overrides the default in bot.py
 # ---------------------------------------------------------------------------
@@ -267,6 +334,8 @@ def run_bot(
         (_on_ping, events.NewMessage(command="/ping")),
         (_on_alert, events.NewMessage(command="/alert")),
         (_on_admin, events.NewMessage(command="/admin")),
+        (_on_chats, events.NewMessage(command="/chats")),
+        (_on_leave, events.NewMessage(command="/leave")),
         (hb_state.make_handler(), events.NewMessage(is_bot=None)),
     ]
     bot = Bot(rpc, hooks, logger=log)
