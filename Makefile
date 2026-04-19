@@ -76,7 +76,7 @@ tags:
 clean:
 	rm -rf .ruff_cache/
 	rm -rf .pytest_cache/
-	rm -rf src/dcagent/__pycache__/
+	find . -type d -name "__pycache__" -delete 2>/dev/null || true
 	find . -name "*.pyc" -delete 2>/dev/null || true
 	rm -rf tests/integration/out/
 	rm -rf dist/
