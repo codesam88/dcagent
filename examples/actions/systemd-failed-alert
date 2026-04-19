@@ -5,21 +5,22 @@
 #   systemd-failed-alert                 # check all units
 #   systemd-failed-alert >> /run/dcagent/dcagent.pipe
 #
-# Configuration (environment variables or /etc/dcagent/systemd-failed.conf):
+# Configuration (environment variables or /etc/dcagent/conf.d/systemd-failed-alert.conf):
 #
 #   WATCH_SERVICES   Space-separated list of service names to watch.
 #                    If set, only these services are checked.
 #                    Default: (all failed units)
 
-# Source dcagent config (provides DCAGENT_PIPE_PATH and other vars)
+# Source global and per-script config
 DCAGENT_CONFIG_PATH="${DCAGENT_CONFIG_PATH:-/etc/dcagent}"
 DCAGENT_CONFIG_FILE="$DCAGENT_CONFIG_PATH/dcagent.conf"
 # shellcheck source=/dev/null
 [[ -f "$DCAGENT_CONFIG_FILE" ]] && source "$DCAGENT_CONFIG_FILE"
 
-CONF_FILE="${CONF_FILE:-/etc/dcagent/systemd-failed.conf}"
+SCRIPT_NAME="${0##*/}"
+ACTION_CONFIG_FILE="$DCAGENT_CONFIG_PATH/conf.d/$SCRIPT_NAME.conf"
 # shellcheck source=/dev/null
-[[ -f "$CONF_FILE" ]] && source "$CONF_FILE"
+[[ -f "$ACTION_CONFIG_FILE" ]] && source "$ACTION_CONFIG_FILE"
 
 WATCH_SERVICES="${WATCH_SERVICES:-}"
 

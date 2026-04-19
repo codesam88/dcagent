@@ -188,19 +188,19 @@ preserved (it may contain your alert and status scripts).
 
 ### Configuration
 
-The service reads environment variables from `$DCAGENT_CONFIG_PATH/dcagent.conf`.
+The service reads environment variables from `$DCAGENT_CONFIG_PATH/dcagent.conf`; action scripts may also load per-script overrides from `$DCAGENT_CONFIG_PATH/conf.d/<script>.conf`.
 Key settings:
 
 | Variable | Default | Description |
 |---|---|---|
-| `DCAGENT_CONFIG_PATH` | `/etc/dcagent` | Root config directory containing `dcagent.conf`, `actions/`, and `cron/` |
+| `DCAGENT_CONFIG_PATH` | `/etc/dcagent` | Root config directory containing `dcagent.conf`, `conf.d/`, `actions/`, and `cron/` |
 | `DCAGENT_PIPE_PATH` | `/run/dcagent/dcagent.pipe` | Unix named pipe path |
 | `DCAGENT_HEARTBEAT` | `60` | Heartbeat broadcast interval (seconds) |
 | `DCAGENT_LOG_LEVEL` | `info` | Log level (`debug`, `info`, `warning`, `error`) |
 
 ### Action scripts
 
-Action scripts (both alerts and status producers) live under `$DCAGENT_CONFIG_PATH/actions`.
+Action scripts (both alerts and status producers) live under `$DCAGENT_CONFIG_PATH/actions` and read optional per-script config from `$DCAGENT_CONFIG_PATH/conf.d/`.
 Scheduling is handled externally via cron or systemd timers. The provided
 `examples/systemd/setup.sh` creates cron interval directories under
 `$DCAGENT_CONFIG_PATH/cron` (hourly.d, daily.d, weekly.d, monthly.d, yearly.d) and

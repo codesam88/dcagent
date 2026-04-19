@@ -92,6 +92,7 @@ else
 fi
 echo "  $N. install systemd unit to $SERVICE_DEST"; (( N++ ))
 echo "  $N. install config file to $CONF_DEST (unless exists)"; (( N++ ))
+echo "  $N. create per-script config dir $DCAGENT_CONF_DIR/conf.d"; (( N++ ))
 echo "  $N. create system user '$DCAGENT_USER' (unless exists)"; (( N++ ))
 echo "  $N. create chatmail account on nine.testrun.org as '$DEFAULT_NAME' (unless already configured)"; (( N++ ))
 echo "  $N. print alert, heartbeat, and admin invite links"; (( N++ ))
@@ -129,6 +130,7 @@ fi
 run install -m 755 -d "$DCAGENT_CONF_DIR"
 # Actions layout: scripts and cron interval dirs
 run install -m 755 -d \
+    "$DCAGENT_CONF_DIR/conf.d" \
     "$DCAGENT_CONF_DIR/actions" \
     "$DCAGENT_CONF_DIR/cron/hourly.d" \
     "$DCAGENT_CONF_DIR/cron/daily.d" \

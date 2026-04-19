@@ -4,7 +4,7 @@
 # usage threshold. Pipe the output to dcagent:
 #   disk-space-alert >> /run/dcagent/dcagent.pipe
 #
-# Configuration (environment variables or /etc/dcagent/disk-space.conf):
+# Configuration (environment variables or /etc/dcagent/conf.d/disk-space-alert.conf):
 #
 #   ALERT_THRESHOLD   Usage percentage that triggers an alert (0-100).
 #                     Default: 90
@@ -14,7 +14,7 @@
 #
 # Usage:
 #   Run from cron or a systemd timer, e.g. every 15 minutes:
-#     */15 * * * * root /usr/local/lib/dcagent/examples/alerts/disk-space-alert >> /run/dcagent/dcagent.pipe
+#     */15 * * * * root /usr/local/lib/dcagent/examples/actions/disk-space-alert >> /run/dcagent/dcagent.pipe
 
 set -euo pipefail
 
@@ -24,15 +24,16 @@ DCAGENT_CONFIG_PATH="${DCAGENT_CONFIG_PATH:-/etc/dcagent}"
 ALERT_THRESHOLD="${ALERT_THRESHOLD:-90}"
 MONITOR_MOUNTS="${MONITOR_MOUNTS:-}"
 
-# ── Load dcagent config if present ────────────────────────────────────────────
+# ── Load global and per-script config ─────────────────────────────────────────
 
 DCAGENT_CONFIG_FILE="$DCAGENT_CONFIG_PATH/dcagent.conf"
 # shellcheck source=/dev/null
 [[ -f "$DCAGENT_CONFIG_FILE" ]] && source "$DCAGENT_CONFIG_FILE"
 
-CONF="/etc/dcagent/disk-space.conf"
+SCRIPT_NAME="${0##*/}"
+ACTION_CONFIG_FILE="$DCAGENT_CONFIG_PATH/conf.d/$SCRIPT_NAME.conf"
 # shellcheck source=/dev/null
-[[ -f "$CONF" ]] && source "$CONF"
+[[ -f "$ACTION_CONFIG_FILE" ]] && source "$ACTION_CONFIG_FILE"
 
 # ── Check disk usage ──────────────────────────────────────────────────────────
 

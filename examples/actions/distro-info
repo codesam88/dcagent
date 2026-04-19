@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 distro-info — report Linux distribution release status to dcagent status.
-Sends: status 01_release <Distro> <codename> [<label>]
+Sends: status ${DISTRO_INFO_STATUS_KEY:-01_release} <Distro> <codename> [<label>]
 Also alerts if a newer stable/LTS release is available.
 
   Debian labels:  stable, oldstable, testing, eol, unknown
@@ -19,7 +19,7 @@ Pipe the output to dcagent:
 
 Usage:
   Run from a systemd timer or cron, e.g. daily:
-    0 6 * * * root /usr/local/lib/dcagent/examples/status/distro-info >> /run/dcagent/dcagent.pipe
+    0 6 * * * root /usr/local/lib/dcagent/examples/actions/distro-info >> /run/dcagent/dcagent.pipe
 """
 
 import os
@@ -46,8 +46,11 @@ def _load_action_conf(path: str) -> dict:
     return conf
 
 
-# Ensure env has DCAGENT_* vars set from action conf
-_load_action_conf(DCAGENT_CONFIG_FILE)
+def load_conf() -> None:
+    _load_action_conf(DCAGENT_CONFIG_FILE)
+    action_path = os.environ.get("DCAGENT_CONFIG_PATH", DCAGENT_CONFIG_PATH)
+    _load_action_conf(f"{action_path}/conf.d/distro-info.conf")
+
 
 # Fallback codename constants used only when distro-info succeeds but returns
 # an empty string for a specific query (highly unlikely; treated as error).
@@ -147,6 +150,8 @@ def _ubuntu_status(codename: str, version_str: str) -> tuple[str, str | None]:
 
 
 def main() -> None:
+    load_conf()
+
     try:
         info = _os_release()
     except OSError as exc:
@@ -175,7 +180,8 @@ def main() -> None:
         print(f"status 01_release {distro.capitalize()} {codename} [error]")
         return
 
-    print(f"status 01_release {distro.capitalize()} {codename} [{label}]")
+    status_key = os.environ.get("DISTRO_INFO_STATUS_KEY", "01_release")
+    print(f"status {status_key} {distro.capitalize()} {codename} [{label}]")
     if newer:
         print(f"alert ⬆️ new stable release available: {newer}")
 

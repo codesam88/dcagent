@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 #
 # disk-status — report the highest disk usage to dcagent status.
-# Sends: status 30_disk <mount>:<pct>%   (worst partition only, e.g. "home:72%")
+# Sends: status ${DISK_STATUS_KEY:-30_disk} <mount>:<pct>%   (worst partition only, e.g. "home:72%")
 # Pipe the output to dcagent:
 #   disk-status >> /run/dcagent/dcagent.pipe
 #
-# Configuration (environment variables or /etc/dcagent/disk-status.conf):
+# Configuration (environment variables or /etc/dcagent/conf.d/disk-status.conf):
 #
 #   MONITOR_MOUNTS    Space-separated list of mount points to check.
 #                     Default: all non-virtual mounted filesystems
 #
 # Usage:
 #   Run from cron or a systemd timer, e.g. every 5 minutes:
-#     */5 * * * * root /usr/local/lib/dcagent/examples/status/disk-status >> /run/dcagent/dcagent.pipe
+#     */5 * * * * root /usr/local/lib/dcagent/examples/actions/disk-status >> /run/dcagent/dcagent.pipe
 
 set -euo pipefail
 
@@ -21,16 +21,15 @@ set -euo pipefail
 DCAGENT_CONFIG_PATH="${DCAGENT_CONFIG_PATH:-/etc/dcagent}"
 MONITOR_MOUNTS="${MONITOR_MOUNTS:-}"
 
-# Source dcagent config (provides DCAGENT_PIPE_PATH and other vars)
+# Source global and per-script config
 DCAGENT_CONFIG_FILE="$DCAGENT_CONFIG_PATH/dcagent.conf"
 # shellcheck source=/dev/null
 [[ -f "$DCAGENT_CONFIG_FILE" ]] && source "$DCAGENT_CONFIG_FILE"
 
-# ── Load config file if present ───────────────────────────────────────────────
-
-CONF="/etc/dcagent/disk-status.conf"
+SCRIPT_NAME="${0##*/}"
+ACTION_CONFIG_FILE="$DCAGENT_CONFIG_PATH/conf.d/$SCRIPT_NAME.conf"
 # shellcheck source=/dev/null
-[[ -f "$CONF" ]] && source "$CONF"
+[[ -f "$ACTION_CONFIG_FILE" ]] && source "$ACTION_CONFIG_FILE"
 
 # ── Find worst partition ──────────────────────────────────────────────────────
 
@@ -52,8 +51,9 @@ while read -r pct mount; do
 done <<< "$df_output"
 
 if [[ -n "$worst_mount" ]]; then
+    status_key="${DISK_STATUS_KEY:-30_disk}"
     # Use basename for brevity; keep "/" as-is
     short="${worst_mount##*/}"
     [[ -z "$short" ]] && short="/"
-    echo "status 30_disk ${short}:${worst_pct}%"
+    echo "status $status_key ${short}:${worst_pct}%"
 fi

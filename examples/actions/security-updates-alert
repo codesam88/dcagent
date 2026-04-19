@@ -3,7 +3,7 @@
 # security-updates-alert — report pending security updates via apt.
 # Sends an alert listing all security packages and a status summary.
 #   alert 🔒 N security update(s) available: pkg1, pkg2, ...
-#   status 10_updates N security update(s) pending   (or: up to date)
+#   status ${SECURITY_UPDATES_ALERT_STATUS_KEY:-10_updates} N security update(s) pending   (or: up to date)
 #
 # Pipe the output to dcagent:
 #   security-updates-alert >> /run/dcagent/dcagent.pipe
@@ -13,15 +13,20 @@
 #
 # Usage:
 #   Run from cron or a systemd timer, e.g. every hour:
-#     0 * * * * root apt-get -qq update && /usr/local/lib/dcagent/examples/alerts/security-updates-alert >> /run/dcagent/dcagent.pipe
+#     0 * * * * root apt-get -qq update && /usr/local/lib/dcagent/examples/actions/security-updates-alert >> /run/dcagent/dcagent.pipe
 
 set -euo pipefail
 
-# Source dcagent config (provides DCAGENT_PIPE_PATH and other vars)
+# Source global and per-script config
 DCAGENT_CONFIG_PATH="${DCAGENT_CONFIG_PATH:-/etc/dcagent}"
 DCAGENT_CONFIG_FILE="$DCAGENT_CONFIG_PATH/dcagent.conf"
 # shellcheck source=/dev/null
 [[ -f "$DCAGENT_CONFIG_FILE" ]] && source "$DCAGENT_CONFIG_FILE"
+
+SCRIPT_NAME="${0##*/}"
+ACTION_CONFIG_FILE="$DCAGENT_CONFIG_PATH/conf.d/$SCRIPT_NAME.conf"
+# shellcheck source=/dev/null
+[[ -f "$ACTION_CONFIG_FILE" ]] && source "$ACTION_CONFIG_FILE"
 
 # ── Discover pending security updates ────────────────────────────────────────
 
@@ -41,7 +46,9 @@ count="${#pkgs[@]}"
 if (( count > 0 )); then
     pkg_list="${pkgs[*]}"
     echo "alert 🔒 ${count} security update(s) available: ${pkg_list// /, }"
-	echo "status 10_updates need-patches"
+    status_key="${SECURITY_UPDATES_ALERT_STATUS_KEY:-10_updates}"
+    echo "status $status_key need-patches"
 else
-    echo "status 10_updates up-to-date"
+    status_key="${SECURITY_UPDATES_ALERT_STATUS_KEY:-10_updates}"
+    echo "status $status_key up-to-date"
 fi

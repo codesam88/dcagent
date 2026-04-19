@@ -15,15 +15,19 @@ Design and conventions
   timers — the agent no longer invokes run-parts itself.
 
 - Configuration: scripts should start by setting `DCAGENT_CONFIG_PATH` to
-  `/etc/dcagent` by default, then source `$DCAGENT_CONFIG_PATH/dcagent.conf` for
-  common variables such as `DCAGENT_PIPE_PATH`.
+  `/etc/dcagent` by default, then source `$DCAGENT_CONFIG_PATH/dcagent.conf`
+  and the optional `$DCAGENT_CONFIG_PATH/conf.d/<script>.conf` for common
+  variables such as `DCAGENT_PIPE_PATH`.
 
   Example (shell):
 
     DCAGENT_CONFIG_PATH="${DCAGENT_CONFIG_PATH:-/etc/dcagent}"
     DCAGENT_CONFIG_FILE="$DCAGENT_CONFIG_PATH/dcagent.conf"
+    ACTION_CONFIG_FILE="$DCAGENT_CONFIG_PATH/conf.d/${0##*/}.conf"
     # shellcheck source=/dev/null
     [[ -f "$DCAGENT_CONFIG_FILE" ]] && source "$DCAGENT_CONFIG_FILE"
+    # shellcheck source=/dev/null
+    [[ -f "$ACTION_CONFIG_FILE" ]] && source "$ACTION_CONFIG_FILE"
 
   Example (python): the script may parse key=value lines from the file and set
   the variables into `os.environ` so code can read `os.environ['DCAGENT_PIPE_PATH']`.
@@ -31,6 +35,7 @@ Design and conventions
 - Output format:
   - Alerts: `alert <message>` (dcagent forwards to alert chats)
   - Status: `status <key> <value>` (dcagent updates the in-chat status map)
+    - Status keys are configurable via a script-specific `*_STATUS_KEY` env var.
 
 - Scheduling:
   - All scheduling is managed externally (cron or systemd timers). The project
@@ -44,9 +49,10 @@ Design and conventions
 
 - Installation and layout (setup.sh):
   - `DCAGENT_CONFIG_PATH` (default `/etc/dcagent`) is the root for configuration
-    and action scripts. `dcagent.conf` lives at `$DCAGENT_CONFIG_PATH/dcagent.conf`.
-    Action scripts live in `$DCAGENT_CONFIG_PATH/actions` and the cron interval
-    directories live in `$DCAGENT_CONFIG_PATH/cron`.
+    and action scripts. `dcagent.conf` lives at `$DCAGENT_CONFIG_PATH/dcagent.conf`,
+    per-script configs live in `$DCAGENT_CONFIG_PATH/conf.d/`, action scripts live
+    in `$DCAGENT_CONFIG_PATH/actions`, and the cron interval directories live in
+    `$DCAGENT_CONFIG_PATH/cron`.
   - Cron-managed interval directories under `$DCAGENT_CONFIG_PATH/cron` include:
       - `hourly.d/`, `daily.d/`, `weekly.d/`, `monthly.d/`, `yearly.d/`
     The example crontab runs run-parts on these directories and redirects output
