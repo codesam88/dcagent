@@ -157,9 +157,13 @@ fi
 
 
 
-# Install example crontab into dcagent user's crontab
+# Install example crontab into dcagent user's crontab (unless one already exists)
 if [[ -f "$SCRIPTDIR/dcagent.crontab" ]]; then
-    run crontab -u "$DCAGENT_USER" "$SCRIPTDIR/dcagent.crontab"
+    if ! crontab -u "$DCAGENT_USER" -l &>/dev/null; then
+        run crontab -u "$DCAGENT_USER" "$SCRIPTDIR/dcagent.crontab"
+    else
+        echo "Skipping crontab installation for $DCAGENT_USER — crontab already exists"
+    fi
 fi
 
 # If /etc/cron.allow exists, ensure the dcagent user is permitted to run per-user cron jobs.
