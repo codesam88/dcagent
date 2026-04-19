@@ -13,6 +13,7 @@ import os
 import stat
 import threading
 import time
+from datetime import datetime
 
 from deltachat2 import Bot, MsgData, Rpc, events
 
@@ -166,10 +167,11 @@ def _on_new_message(bot: Bot, accid: int, event) -> None:
 
 def _on_help(bot: Bot, accid: int, event) -> None:
     msg = event.msg
+    bot_name = bot.rpc.get_config(accid, "displayname") or APP_NAME
     bot.rpc.send_msg(
         accid,
         msg.chat_id,
-        MsgData(text=f"👋 Hi! I am {APP_NAME}.\n\nCommands:\n  /help  – show this\n  /ping  – check I'm alive"),
+        MsgData(text=f"👋 Hi! I am {bot_name}.\n\nCommands:\n  /help  – show this\n  /ping  – check I'm alive"),
     )
 
 
@@ -220,6 +222,15 @@ def run_bot(
 
     if _bot._get_heartbeat_chats(rpc, accid):
         hb_state.start(rpc, accid, our_addr)
+
+    # Send startup message to alert chats
+    chat_ids = _bot._get_alert_chats(rpc, accid)
+    if chat_ids:
+        bot_name = rpc.get_config(accid, "displayname") or APP_NAME
+        startup_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        startup_msg = f"{bot_name} started at {startup_time}"
+        for chat_id in chat_ids:
+            rpc.send_msg(accid, chat_id, MsgData(text=startup_msg))
 
     while True:
         try:
