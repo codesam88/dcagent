@@ -1,0 +1,23 @@
+# crontab for the 'dcagent' user — runs action scripts at standard intervals.
+# Install with: sudo crontab -u dcagent /etc/dcagent/dcagent.crontab
+# This file is an example and will be installed by setup.sh into the dcagent
+# user's crontab.
+
+# Ensure the action config is available to the scripts
+# (adjust path if you installed the config elsewhere)
+ACTION_CONF=/etc/dcagent/dcagent.conf
+
+# Hourly: run all scripts in hourly.d
+0 * * * * ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/actions/hourly.d >> /run/dcagent/dcagent.pipe 2>/dev/null
+
+# Daily: run all scripts in daily.d at 06:00
+0 6 * * * ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/actions/daily.d >> /run/dcagent/dcagent.pipe 2>/dev/null
+
+# Weekly: Sundays at 06:00
+0 6 * * 0 ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/actions/weekly.d >> /run/dcagent/dcagent.pipe 2>/dev/null
+
+# Monthly: 1st day of month at 06:00
+0 6 1 * * ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/actions/monthly.d >> /run/dcagent/dcagent.pipe 2>/dev/null
+
+# Yearly: Jan 1st at 06:00
+0 6 1 1 * ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/actions/yearly.d >> /run/dcagent/dcagent.pipe 2>/dev/null

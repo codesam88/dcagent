@@ -125,11 +125,32 @@ if [[ ! -f "$CONF_DEST" ]]; then
     run install -m 755 -d "$DCAGENT_CONF_DIR"
     run install -m 644 "$SCRIPTDIR/dcagent.conf" "$CONF_DEST"
 fi
+# Create config/action directories
+run install -m 755 -d "$DCAGENT_CONF_DIR"
+# Actions layout: scripts.d and interval dirs
 run install -m 755 -d \
-    "$DCAGENT_CONF_DIR/alert-available" \
-    "$DCAGENT_CONF_DIR/alert-enabled" \
-    "$DCAGENT_CONF_DIR/status-available" \
-    "$DCAGENT_CONF_DIR/status-enabled"
+    "$DCAGENT_CONF_DIR/actions/scripts.d" \
+    "$DCAGENT_CONF_DIR/actions/hourly.d" \
+    "$DCAGENT_CONF_DIR/actions/daily.d" \
+    "$DCAGENT_CONF_DIR/actions/weekly.d" \
+    "$DCAGENT_CONF_DIR/actions/monthly.d" \
+    "$DCAGENT_CONF_DIR/actions/yearly.d"
+
+# Copy example action scripts into scripts.d (do not overwrite existing files)
+if [[ -d "$SCRIPTDIR/../examples/actions" ]]; then
+    for f in "$SCRIPTDIR/../examples/actions"/*; do
+        fname=$(basename "$f")
+        dest="$DCAGENT_CONF_DIR/actions/scripts.d/$fname"
+        if [[ ! -e "$dest" ]]; then
+            run install -m 755 "$f" "$dest"
+        fi
+    done
+fi
+
+# Install example crontab into dcagent user's crontab
+if [[ -f "$SCRIPTDIR/dcagent.crontab" ]]; then
+    run crontab -u "$DCAGENT_USER" "$SCRIPTDIR/dcagent.crontab"
+fi
 run systemctl daemon-reload
 
 # Skip init if an account is already configured (e.g. re-install over existing setup)
