@@ -4,21 +4,25 @@ Guide for AI agents working with `dcagent`.
 
 Review the README for general intro and usage.
 
-## Agent Instructions
+## Development Workflow for Agents
 
 1. Only the user is allowed to change files outside the project root directory.
 
-2. Inside the project root directory, Agents can change or delete any files which
+2. Do not commit changes automatically and never rewrite git history without explicit user request. 
+
+3. Inside the project root directory, Agents can change or delete any files which
    are tracked in git. But ask the user before modifying files not tracked in git.
 
-3. Before working on files, re-read them in case they were changed by the user.
+4. Files may be changed by the user. When edits fail, try to re-read the file
+   for possible manual changes. Be careful not to revert such manual changes.
 
-4. After any modification, always run tests (`make test`)
+5. After any significant modifications, run tests (`make test`)
 
-5. Once tests are successful, ask the user for review.
+6. When tests ran successfully, ask the user to review and request changes.
 
-6. Once the user is happy or about to commit, review the documentation for any
-   necessary updates.
+7. Prior to commit, stop to consider if any supporting documentation,
+   examples, scripts may still need to be updated.
+
 
 ## Testing
 
