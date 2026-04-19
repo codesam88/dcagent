@@ -33,12 +33,10 @@ Design and conventions
 
 - Scheduling:
   - All scheduling is managed externally (cron or systemd timers). The project
-    provides:
-      - a dcagent user crontab example (examples/systemd/dcagent.crontab) that
-        runs run-parts on cron interval directories under DCAGENT_CRON_DIR.
-      - a cron.d-style example (examples/systemd/dcagent.cron.d) which can be
-        copied into DCAGENT_CRON_DIR/cron.d/ or merged into /etc/cron.d/ for
-        system-level scheduling.
+    provides a dcagent user crontab example (examples/systemd/dcagent.crontab) that
+    runs run-parts on cron interval directories under "$DCAGENT_CONFIG_DIR/cron". To add
+    custom execution times, edit the dcagent user's crontab with
+    `crontab -e -u dcagent`.
   - dcagent no longer invokes run-parts internally; scripts are executed by
     cron or timers. For short-interval checks prefer systemd timers or a
     frequent cron schedule.

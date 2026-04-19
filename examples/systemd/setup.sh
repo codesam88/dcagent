@@ -134,8 +134,7 @@ run install -m 755 -d \
     "$DCAGENT_CONF_DIR/cron/daily.d" \
     "$DCAGENT_CONF_DIR/cron/weekly.d" \
     "$DCAGENT_CONF_DIR/cron/monthly.d" \
-    "$DCAGENT_CONF_DIR/cron/yearly.d" \
-    "$DCAGENT_CONF_DIR/cron/cron.d"
+    "$DCAGENT_CONF_DIR/cron/yearly.d"
 
 # Copy example action scripts into actions/ (do not overwrite existing files)
 if [[ -d "$SCRIPTDIR/../examples/actions" ]]; then
@@ -148,17 +147,24 @@ if [[ -d "$SCRIPTDIR/../examples/actions" ]]; then
     done
 fi
 
-# Copy example cron.d file into cron/cron.d
-if [[ -f "$SCRIPTDIR/dcagent.cron.d" ]]; then
-    if [[ ! -e "$DCAGENT_CONF_DIR/cron/cron.d/dcagent" ]]; then
-        run install -m 644 "$SCRIPTDIR/dcagent.cron.d" "$DCAGENT_CONF_DIR/cron/cron.d/dcagent"
-    fi
-fi
+
 
 # Install example crontab into dcagent user's crontab
 if [[ -f "$SCRIPTDIR/dcagent.crontab" ]]; then
     run crontab -u "$DCAGENT_USER" "$SCRIPTDIR/dcagent.crontab"
 fi
+
+# If /etc/cron.allow exists, ensure the dcagent user is permitted to run per-user cron jobs.
+# Some systems restrict which users can run crontab -u via /etc/cron.allow; warn the
+# administrator if the file exists and does not include the dcagent user.
+if [[ -f /etc/cron.allow ]]; then
+    if ! grep -qxF "$DCAGENT_USER" /etc/cron.allow; then
+        echo "WARNING: /etc/cron.allow exists. Add '$DCAGENT_USER' to /etc/cron.allow to allow per-user cron jobs."
+        echo "You can run:  echo '$DCAGENT_USER' >> /etc/cron.allow"
+        echo
+    fi
+fi
+
 run systemctl daemon-reload
 
 # Skip init if an account is already configured (e.g. re-install over existing setup)
