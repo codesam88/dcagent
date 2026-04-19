@@ -127,20 +127,20 @@ if [[ ! -f "$CONF_DEST" ]]; then
 fi
 # Create config/action directories
 run install -m 755 -d "$DCAGENT_CONF_DIR"
-# Actions layout: scripts.d and interval dirs
+# Actions layout: scripts and cron interval dirs
 run install -m 755 -d \
-    "$DCAGENT_CONF_DIR/actions/scripts.d" \
-    "$DCAGENT_CONF_DIR/actions/hourly.d" \
-    "$DCAGENT_CONF_DIR/actions/daily.d" \
-    "$DCAGENT_CONF_DIR/actions/weekly.d" \
-    "$DCAGENT_CONF_DIR/actions/monthly.d" \
-    "$DCAGENT_CONF_DIR/actions/yearly.d"
+    "$DCAGENT_CONF_DIR/actions" \
+    "$DCAGENT_CONF_DIR/cron/hourly.d" \
+    "$DCAGENT_CONF_DIR/cron/daily.d" \
+    "$DCAGENT_CONF_DIR/cron/weekly.d" \
+    "$DCAGENT_CONF_DIR/cron/monthly.d" \
+    "$DCAGENT_CONF_DIR/cron/yearly.d"
 
-# Copy example action scripts into scripts.d (do not overwrite existing files)
+# Copy example action scripts into actions/ (do not overwrite existing files)
 if [[ -d "$SCRIPTDIR/../examples/actions" ]]; then
     for f in "$SCRIPTDIR/../examples/actions"/*; do
         fname=$(basename "$f")
-        dest="$DCAGENT_CONF_DIR/actions/scripts.d/$fname"
+        dest="$DCAGENT_CONF_DIR/actions/$fname"
         if [[ ! -e "$dest" ]]; then
             run install -m 755 "$f" "$dest"
         fi

@@ -8,16 +8,16 @@
 ACTION_CONF=/etc/dcagent/dcagent.conf
 
 # Hourly: run all scripts in hourly.d
-0 * * * * ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/actions/hourly.d >> /run/dcagent/dcagent.pipe 2>/dev/null
+0 * * * * ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/cron/hourly.d >> /run/dcagent/dcagent.pipe 2>/dev/null
 
 # Daily: run all scripts in daily.d at 06:00
-0 6 * * * ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/actions/daily.d >> /run/dcagent/dcagent.pipe 2>/dev/null
+0 6 * * * ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/cron/daily.d >> /run/dcagent/dcagent.pipe 2>/dev/null
 
 # Weekly: Sundays at 06:00
-0 6 * * 0 ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/actions/weekly.d >> /run/dcagent/dcagent.pipe 2>/dev/null
+0 6 * * 0 ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/cron/weekly.d >> /run/dcagent/dcagent.pipe 2>/dev/null
 
 # Monthly: 1st day of month at 06:00
-0 6 1 * * ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/actions/monthly.d >> /run/dcagent/dcagent.pipe 2>/dev/null
+0 6 1 * * ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/cron/monthly.d >> /run/dcagent/dcagent.pipe 2>/dev/null
 
 # Yearly: Jan 1st at 06:00
-0 6 1 1 * ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/actions/yearly.d >> /run/dcagent/dcagent.pipe 2>/dev/null
+0 6 1 1 * ACTION_CONF=/etc/dcagent/dcagent.conf /usr/bin/run-parts /etc/dcagent/cron/yearly.d >> /run/dcagent/dcagent.pipe 2>/dev/null

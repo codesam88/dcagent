@@ -41,26 +41,23 @@ Design and conventions
 
 - Installation and layout (setup.sh):
   - `DCAGENT_CONFIG_DIR` (default `/etc/dcagent`) is the root for configuration
-    and action scripts. `DCAGENT_ACTION_DIR` defaults to
-    `$DCAGENT_CONFIG_DIR/actions`.
-  - Under `DCAGENT_ACTION_DIR` the following directories are used:
-      - `scripts.d/`  — canonical location for the real scripts (setup.sh will copy
-        example scripts here)
-      - `hourly.d/`, `daily.d/`, `weekly.d/`, `monthly.d/`, `yearly.d/` —
-        interval directories intended to be invoked from the dcagent user's crontab
-        (by default the crontab calls run-parts on these directories)
+    and action scripts. `DCAGENT_ACTION_DIR` defaults to `$DCAGENT_CONFIG_DIR/actions` and
+    holds the real executable scripts.
+  - Cron-managed interval directories live under `$DCAGENT_CONFIG_DIR/cron`:
+      - `hourly.d/`, `daily.d/`, `weekly.d/`, `monthly.d/`, `yearly.d/`
+    The example crontab runs run-parts on these directories and redirects output
+    to the dcagent pipe.
   - The setup script copies the example action scripts into
-    `$DCAGENT_ACTION_DIR/scripts.d/` and creates the interval dirs. Enabling a
+    `$DCAGENT_ACTION_DIR/` and creates the cron interval dirs. Enabling a
     script for an interval is done by creating a symlink from
-    `scripts.d/<script>` into the desired `<interval>.d/` directory.
+    `$DCAGENT_ACTION_DIR/<script>` into the desired cron directory (`cron/hourly.d/`).
 
   Example (enable security updates hourly):
 
-    ln -s /etc/dcagent/actions/scripts.d/security-updates-alert /etc/dcagent/actions/hourly.d/
+    ln -s /etc/dcagent/actions/security-updates-alert /etc/dcagent/cron/hourly.d/
 
-  - setup.sh will also optionally install the provided crontab into the
-    `dcagent` user's crontab so the hourly/daily/... jobs run automatically.
-
+  - setup.sh will also install the provided crontab into the `dcagent` user's
+    crontab so the hourly/daily/... jobs run automatically.
 - Dependencies: scripts should declare external dependencies at the top (e.g.
   `lm-sensors` for temperature checks or `distro-info` for release reporting)
   and print a helpful error to stderr if a dependency is missing.
