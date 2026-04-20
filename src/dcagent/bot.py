@@ -24,8 +24,10 @@ Pipe input format:
     status <key> <msg>           update status element key to msg
 """
 
+import atexit
 import logging
 import os
+import signal
 import subprocess
 import sys
 import threading
@@ -41,6 +43,28 @@ _JOIN_TIMEOUT = 60
 _INIT_TIMEOUT = 120
 
 log = logging.getLogger(__name__)
+
+# Track the current account database for lock cleanup
+_LOCKED_ACCOUNT_DB: Optional[str] = None
+
+
+def _atexit_cleanup() -> None:
+    """Clean up lock file on exit."""
+    global _LOCKED_ACCOUNT_DB
+    if _LOCKED_ACCOUNT_DB:
+        _remove_dcagent_lock(_LOCKED_ACCOUNT_DB)
+        _LOCKED_ACCOUNT_DB = None
+
+
+def _signal_handler(signum: int, frame) -> None:
+    """Handle termination signals by exiting cleanly (atexit will clean up)."""
+    sys.exit(0)
+
+
+# Register handlers
+atexit.register(_atexit_cleanup)
+signal.signal(signal.SIGTERM, _signal_handler)
+signal.signal(signal.SIGINT, _signal_handler)
 
 
 def _get_version() -> str:
@@ -64,6 +88,46 @@ class AgentError(Exception):
 def _accounts_dir(config_dir: str) -> str:
     os.makedirs(config_dir, exist_ok=True)
     return os.path.join(config_dir, "accounts")
+
+
+def _get_dcagent_lock_file(account_db: str) -> str:
+    """Get path to dcagent's own lock file for this account."""
+    accounts_dir = _accounts_dir(account_db)
+    return os.path.join(accounts_dir, ".dcagent.lock")
+
+
+def _check_dcagent_lock(account_db: str) -> Optional[str]:
+    """Check if another dcagent process holds a lock.
+
+    Retries a few times to allow cleanup from recently terminated processes.
+    Returns lock file path if it exists after retries, None otherwise.
+    """
+    for attempt in range(5):
+        lock_file = _get_dcagent_lock_file(account_db)
+        if not os.path.exists(lock_file):
+            return None
+        if attempt < 4:  # Don't sleep on last attempt
+            time.sleep(0.5)
+    return lock_file
+
+
+def _write_dcagent_lock(account_db: str) -> None:
+    """Write lock file with current process PID."""
+    lock_file = _get_dcagent_lock_file(account_db)
+    try:
+        with open(lock_file, "w") as f:
+            f.write(str(os.getpid()))
+    except OSError:
+        pass  # Lock file write failure is not fatal
+
+
+def _remove_dcagent_lock(account_db: str) -> None:
+    """Remove lock file."""
+    lock_file = _get_dcagent_lock_file(account_db)
+    try:
+        os.remove(lock_file)
+    except OSError:
+        pass  # Lock file removal failure is not fatal
 
 
 def _get_account(rpc: Rpc) -> int:
@@ -510,7 +574,17 @@ def main(argv: Optional[list] = None) -> None:
     accounts_dir = _accounts_dir(args.account_db)
     kwargs = {} if args.log_level == "debug" else {"stderr": subprocess.DEVNULL}
 
+    # Check if another process holds a lock
+    lock_file = _check_dcagent_lock(args.account_db)
+    if lock_file:
+        log.error("Could not acquire lock. Another dcagent process is running this account.")
+        log.error("Lock file: %s", lock_file)
+        sys.exit(1)
+
     try:
+        global _LOCKED_ACCOUNT_DB
+        _write_dcagent_lock(args.account_db)
+        _LOCKED_ACCOUNT_DB = args.account_db
         with IOTransport(accounts_dir=accounts_dir, **kwargs) as trans:
             rpc = Rpc(trans)
             log.debug("deltachat core %s", rpc.get_system_info().deltachat_core_version)
@@ -527,6 +601,8 @@ def main(argv: Optional[list] = None) -> None:
     except AgentError as exc:
         log.error("%s", exc)
         sys.exit(1)
+
+    sys.exit(0)  # trigger atexit handler for final cleanup
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@
 set -euo pipefail
 source "$(dirname "$0")/helpers.sh"
 trap cleanup EXIT
+check_no_stale_locks
 
 echo "==> Starting OWNER serve ..."
 > "$OWNER_LOG"

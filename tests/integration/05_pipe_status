@@ -5,6 +5,7 @@
 set -euo pipefail
 source "$(dirname "$0")/helpers.sh"
 trap cleanup EXIT
+check_no_stale_locks
 
 echo "==> Starting AGENT serve (debug logging) ..."
 > "$AGENT_LOG"

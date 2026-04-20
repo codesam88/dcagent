@@ -53,6 +53,38 @@ dump_logs() {
     [[ -f "$AGENT_LOG" ]] && { echo "--- AGENT log ($AGENT_LOG) ---" >&2; cat "$AGENT_LOG" >&2; }
 }
 
+check_no_stale_locks() {
+    local owner_lock="$OWNER_DIR/accounts/.dcagent.lock"
+    local agent_lock="$AGENT_DIR/accounts/.dcagent.lock"
+    local max_wait=5
+    local elapsed=0
+
+    # Wait for lock files to be removed (atexit handler may still be running)
+    while (( elapsed < max_wait )); do
+        local owner_exists=0 agent_exists=0
+        [[ -f "$owner_lock" ]] && owner_exists=1
+        [[ -f "$agent_lock" ]] && agent_exists=1
+
+        if (( !owner_exists && !agent_exists )); then
+            return 0  # Both locks cleaned up
+        fi
+
+        sleep 0.5
+        elapsed=$(( elapsed + 1 ))
+    done
+
+    # If we get here, at least one lock is still present
+    if [[ -f "$owner_lock" ]]; then
+        local pid=$(cat "$owner_lock" 2>/dev/null)
+        fatal_abort "Stale OWNER lock file found (PID: $pid). Run 'make clean' to remove it."
+    fi
+
+    if [[ -f "$agent_lock" ]]; then
+        local pid=$(cat "$agent_lock" 2>/dev/null)
+        fatal_abort "Stale AGENT lock file found (PID: $pid). Run 'make clean' to remove it."
+    fi
+}
+
 OWNER_PROVISIONED="$OWNER_DIR/.provisioning_success"
 AGENT_PROVISIONED="$AGENT_DIR/.provisioning_success"
 OWNER_LOCK="$OWNER_DIR/.lock"
