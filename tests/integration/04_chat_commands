@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+#
+# Test alert/admin chat management.
+# Tests that AGENT can join alert chats and the config is properly maintained.
+
+set -euo pipefail
+source "$(dirname "$0")/helpers.sh"
+trap cleanup EXIT
+
+echo "==> Getting OWNER alert invite ..."
+OWNER_ALERT_INVITE=$($OWNER alert 2>/dev/null | grep '^https://' | head -1)
+echo "    invite=$OWNER_ALERT_INVITE"
+
+echo "==> Getting OWNER admin invite ..."
+OWNER_ADMIN_INVITE=$($OWNER admin 2>/dev/null | grep '^https://' | head -1)
+echo "    invite=$OWNER_ADMIN_INVITE"
+
+echo "==> AGENT joining OWNER's admin chat ..."
+timeout 30 $AGENT admin "$OWNER_ADMIN_INVITE" 2>/dev/null || fatal_abort "AGENT failed to join admin chat"
+echo "OK: AGENT joined admin chat"
+
+echo "==> Checking AGENT admin chat is configured ..."
+AGENT_ADMIN_CHATS=$($AGENT config ui.admin_chats 2>/dev/null | sed "s/ui.admin_chats='\(.*\)'/\1/")
+if [[ -z "$AGENT_ADMIN_CHATS" ]]; then
+    fatal_abort "AGENT admin chats not configured"
+fi
+echo "OK: AGENT admin chats = $AGENT_ADMIN_CHATS"
+
+echo "==> AGENT joining OWNER's alert chat ..."
+timeout 30 $AGENT alert "$OWNER_ALERT_INVITE" 2>/dev/null || fatal_abort "AGENT failed to join alert chat"
+echo "OK: AGENT joined alert chat"
+
+echo "==> Checking AGENT alert chat is configured ..."
+AGENT_ALERT_CHATS=$($AGENT config ui.alert_chats 2>/dev/null | sed "s/ui.alert_chats='\(.*\)'/\1/")
+if [[ -z "$AGENT_ALERT_CHATS" ]]; then
+    fatal_abort "AGENT alert chats not configured"
+fi
+echo "OK: AGENT alert chats = $AGENT_ALERT_CHATS"
+
+echo "==> Starting OWNER serve ..."
+> "$OWNER_LOG"
+$OWNER --log-level debug serve >> "$OWNER_LOG" 2>&1 &
+OWNER_PID=$!
+wait_for_log "$OWNER_LOG" "Listening at" "$TIMEOUT"
+
+echo "==> Starting AGENT serve ..."
+> "$AGENT_LOG"
+$AGENT --log-level debug serve >> "$AGENT_LOG" 2>&1 &
+AGENT_PID=$!
+wait_for_log "$AGENT_LOG" "Listening at" "$TIMEOUT"
+
+echo "==> Waiting for startup messages to be sent ..."
+sleep 3
+
+echo "==> Stopping both servers ..."
+kill "$OWNER_PID" 2>/dev/null || true
+kill "$AGENT_PID" 2>/dev/null || true
+sleep 1
+
+echo "==> Verifying alert chat list still contains both chats ..."
+ALERT_CHATS_AFTER=$($AGENT config ui.alert_chats 2>/dev/null | sed "s/ui.alert_chats='\(.*\)'/\1/" || echo "")
+if [[ -z "$ALERT_CHATS_AFTER" ]]; then
+    fatal_abort "Alert chats cleared after serve"
+fi
+echo "OK: Alert chats preserved: $ALERT_CHATS_AFTER"
+
+echo "==> Verifying admin chat list still contains admin chat ..."
+ADMIN_CHATS_AFTER=$($AGENT config ui.admin_chats 2>/dev/null | sed "s/ui.admin_chats='\(.*\)'/\1/" || echo "")
+if [[ -z "$ADMIN_CHATS_AFTER" ]]; then
+    fatal_abort "Admin chats cleared after serve"
+fi
+echo "OK: Admin chats preserved: $ADMIN_CHATS_AFTER"
+
+echo "PASS [$0]"

@@ -32,7 +32,7 @@ test-scripts:
 
 # Run unit tests and linters
 test: test-scripts
-	uv run ruff check
+	uv run ruff check --fix
 	uv run pytest
 	pre-commit run --all-files
 
