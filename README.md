@@ -292,7 +292,8 @@ The most common commands are wrapped into makefile helpers:
 | Command      | Purpose |
 |--------------|---------|
 | `make run`   | Start the agent |
-| `make test`  | Run all tests (linter, pytest, pre-commit) |
+| `make check` | Run linter, pytest, and pre-commit hooks |
+| `make test`  | Run all tests (check + integration tests) |
 | `make format`| Format code with ruff |
 | `make clean` | Remove build/cache artifacts |
 | `make help`  | Show all targets |

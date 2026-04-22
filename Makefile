@@ -8,16 +8,15 @@ help:
 	@echo "dcagent - Makefile targets"
 	@echo ""
 	@echo "  run              - Start the agent"
-	@echo "  test             - Run unit tests and linters (including test-scripts)"
-	@echo "  test-scripts     - Syntax check all shell and Python scripts"
-	@echo "  test-online      - Run unit tests then integration tests (requires network)"
-	@echo "  test-all         - Alias for test-online"
+	@echo "  check            - Run pre-commit checks, auto-format, linting, unit tests"
+	@echo "  format           - Auto-format code (ruff/Black)"
+	@echo "  test-online      - Run online integration tests (reset account using 'make clean')"
+	@echo "  test             - Run offline/static as well as online tests"
 	@echo "  dist             - Build release binary (dist/dcagent-<arch>.pyz)"
 	@echo "  install          - Install as a system service (builds dist if needed)"
 	@echo "  uninstall        - Remove a previously installed dcagent service"
 	@echo "  docs             - Regenerate docs/deltachat-rpc-api.md from installed binary"
-	@echo "  tags             - Generate ctags for src/ (vim/ctags)"
-	@echo "  format           - Format code"
+	@echo "  tags             - Generate ctags for src/ (ctags)"
 	@echo "  clean            - Clean build artifacts"
 	@echo "  help             - Show this help message"
 
@@ -31,7 +30,7 @@ test-scripts:
 	python3 scripts/check-alert-script examples/actions
 
 # Run unit tests and linters
-test: test-scripts
+check: test-scripts
 	uv run ruff check --fix
 	uv run pytest
 	pre-commit run --all-files
@@ -41,7 +40,7 @@ test-online:
 	run-parts tests/integration
 
 # Run all tests
-test-all: test test-online
+test: check test-online
 
 # Auto-format code
 format:

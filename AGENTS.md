@@ -31,7 +31,10 @@ Review the README for general intro and usage.
 ## Testing
 
 Tests are implemented using pytest and static linter.
-Run basic tests using `make test`. Run all tests using `make test-all`.
+
+Run offline tests (linter, pytest, pre-commit) using `make check`.
+Run all tests (offline + integration) using `make test`.
+Run only integration tests using `make test-online`.
 
 Or run specific tests using respective commands:
 
