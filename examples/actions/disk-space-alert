@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# disk-space-alert — print a line to stdout for each partition exceeding a
-# usage threshold. Pipe the output to dcagent:
-#   disk-space-alert >> /run/dcagent/dcagent.pipe
+# disk-space-alert — report each partition exceeding a usage threshold to dcagent.
+# Pipe the output to a socket listener via netcat:
+#   disk-space-alert | nc -U /run/dcagent/dcagent.sock
 #
 # Configuration (environment variables or $DCAGENT_CONFIG_PATH/conf.d/disk-space-alert.conf):
 #
@@ -14,7 +14,7 @@
 #
 # Usage:
 #   Run from cron or a systemd timer, e.g. every 15 minutes:
-#     */15 * * * * root /usr/local/lib/dcagent/examples/actions/disk-space-alert >> /run/dcagent/dcagent.pipe
+#     */15 * * * * root /usr/local/lib/dcagent/examples/actions/disk-space-alert | nc -U $DCAGENT_LISTEN_SOCKET
 
 set -euo pipefail
 

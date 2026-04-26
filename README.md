@@ -128,26 +128,43 @@ for the full protocol spec.
 
 ### 8. Send external commands
 
-The agent can accept commands from a Unix named pipe. Start with the `--pipe-path` option:
+The agent can accept commands from a Unix domain socket or TCP socket.
+
+Start with `--listen-socket` for a Unix socket (recommended for local use):
 
 ```bash
-uv run dcagent serve --pipe-path /tmp/dcagent.pipe
+uv run dcagent serve --listen-socket /tmp/dcagent.sock
 ```
 
-Then send commands:
+Or `--listen-addr` for TCP (useful for network access):
 
 ```bash
-# Alert with category and message (sent if state changes)
-echo "alert disk-usage-root disk 95% full" > /tmp/dcagent.pipe
+uv run dcagent serve --listen-addr 127.0.0.1:9999
+```
+
+Or both simultaneously:
+
+```bash
+uv run dcagent serve --listen-socket /tmp/dcagent.sock --listen-addr 127.0.0.1:9999
+```
+
+Then send commands via `nc` (netcat):
+
+```bash
+# Via Unix socket
+echo "alert disk-usage-root disk 95% full" | nc -U /tmp/dcagent.sock
+
+# Via TCP
+echo "alert disk-usage-root disk 95% full" | nc 127.0.0.1 9999
 
 # Clear an alert (sends recovery message on first clear)
-echo "alert disk-usage-root" > /tmp/dcagent.pipe
+echo "alert disk-usage-root" | nc -U /tmp/dcagent.sock
 
 # Immediate alert without deduplication (category "")
-echo "alert '' CRITICAL: System overheating!" > /tmp/dcagent.pipe
+echo "alert '' CRITICAL: System overheating!" | nc -U /tmp/dcagent.sock
 
 # Update status
-echo "status disk 95%" > /tmp/dcagent.pipe
+echo "status disk 95%" | nc -U /tmp/dcagent.sock
 ```
 
 **Handling of Status Inputs**
@@ -170,7 +187,7 @@ individual sensor names as part of the category, thus supporting
 multiple/parallel alarm types.
 
 ```bash
-examples/actions/disk-space-alert >> /run/dcagent/dcagent.pipe
+examples/actions/disk-space-alert | nc -U /run/dcagent/dcagent.sock
 ```
 
 ## Deployment
@@ -221,7 +238,8 @@ Key settings:
 | Variable | Default | Description |
 |---|---|---|
 | `DCAGENT_CONFIG_PATH` | `/etc/dcagent` | Root config directory containing `dcagent.conf`, `conf.d/`, `actions/`, and `cron/` |
-| `DCAGENT_PIPE_PATH` | `/run/dcagent/dcagent.pipe` | Unix named pipe path |
+| `DCAGENT_LISTEN_SOCKET` | `/run/dcagent/dcagent.sock` | Unix domain socket path |
+| `DCAGENT_LISTEN_ADDR` | (disabled) | TCP socket address (host:port format) |
 | `DCAGENT_HEARTBEAT` | `60` | Heartbeat broadcast interval (seconds) |
 | `DCAGENT_LOG_LEVEL` | `info` | Log level (`debug`, `info`, `warning`, `error`) |
 
@@ -249,22 +267,26 @@ echo "status my_key some value"
 ```
 
 Ready-made example scripts are in `examples/actions/`.
-They can also be run standalone by redirecting to the pipe:
+They can also be run standalone by piping to the socket:
 
 ```bash
-examples/actions/disk-space-alert >> /run/dcagent/dcagent.pipe
+examples/actions/disk-space-alert | nc -U /run/dcagent/dcagent.sock
 ```
 
 ### Usage
 
-The unit runs as the `dcagent` user, restarts on failure, and exposes a pipe
-at `/run/dcagent/dcagent.pipe` for external commands.
+The unit runs as the `dcagent` user, restarts on failure, and exposes sockets
+for external commands.
 
-Send alerts or status updates directly via the pipe:
+Send alerts or status updates directly via socket:
 
 ```bash
-echo "alert Disk /data is 95% full"    > /run/dcagent/dcagent.pipe
-echo "status 01_reboot [needs-reboot]" > /run/dcagent/dcagent.pipe
+# Unix socket
+echo "alert Disk /data is 95% full" | nc -U /run/dcagent/dcagent.sock
+echo "status 01_reboot [needs-reboot]" | nc -U /run/dcagent/dcagent.sock
+
+# Or via TCP if configured
+echo "alert Disk /data is 95% full" | nc 127.0.0.1 9999
 ```
 
 Check status and logs:
@@ -279,7 +301,7 @@ journalctl -u dcagent -f
 
 ## Components
 
-- **`src/dcagent/`** — package source: `agent.py` (runtime, pipe listener, chat handlers), `bot.py` (CLI, account lifecycle), `heartbeat.py` (heartbeat protocol)
+- **`src/dcagent/`** — package source: `agent.py` (runtime, socket listeners, chat handlers), `bot.py` (CLI, account lifecycle), `heartbeat.py` (heartbeat protocol)
 - **`tests/`** — unit tests (pytest + mocks) and integration tests
 - **`docs/`** — protocol and feature documentation
 - **`examples/`** — monitoring scripts for alerts and status, plus systemd service setup

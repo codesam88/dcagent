@@ -3,15 +3,15 @@
 This directory contains "action" scripts: self-contained programs that issue
 alert or status messages. Actions are intended to be small, self-contained
 checks that run periodically and write single-line commands to stdout. The
-caller (scheduler) redirects these outputs to a unix pipe exposed by dcagent.
+caller (scheduler) redirects these outputs to a socket exposed by dcagent.
 
 ## Design and conventions
 
 - Scheduling: Each action can output one or more alert messages (`alert
   <category> <message>`) and/or set a field in the bot's status line (`status
   <key> <value>`). An external scheduler such as Cron can be used to launch the
-  scripts and forward the output to the dcagent exposed unix pipe. For detailed
-  syntax see the bot's pipe command documentation.
+  scripts and forward the output to the dcagent socket listener. For detailed
+  syntax see the bot's socket command documentation.
 
 - Configuration: scripts should use `DCAGENT_CONFIG_PATH` (default:
   `/etc/dcagent`) and source its dcagent.conf for global settings, then source an
@@ -30,8 +30,7 @@ caller (scheduler) redirects these outputs to a unix pipe exposed by dcagent.
 - Safety and logging: Avoid long-running blocking operations in the run-parts
   context as they may block other actions. Setup a separate cron schedule or
   systemd.timer event instead. Make sure you receive errors from failed cron
-  executions, e.g. using logcheck. In principle, I guess we should also be using
-  a proper socket or a mutual file lock on the unix pipe to avoid cross-talk.
+  executions, e.g. using logcheck.
 
 - Message Load: Every status update and every new alert message creates
   a broadcast message to all enabled chats and participants. Since actions are

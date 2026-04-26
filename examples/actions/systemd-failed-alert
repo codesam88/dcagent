@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Report failed systemd services to stdout.
+# Report failed systemd services to dcagent.
 #
 # Usage:
-#   systemd-failed-alert                 # check all units
-#   systemd-failed-alert >> /run/dcagent/dcagent.pipe
+#   systemd-failed-alert | nc -U /run/dcagent/dcagent.sock
 #
 # Configuration (environment variables or $DCAGENT_CONFIG_PATH/conf.d/systemd-failed-alert.conf):
 #

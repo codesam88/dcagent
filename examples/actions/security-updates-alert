@@ -5,15 +5,15 @@
 #   alert security-updates N security update(s) available: pkg1, pkg2, ...
 #   status ${SECURITY_UPDATES_ALERT_STATUS_KEY:-10_updates} N security update(s) pending   (or: up to date)
 #
-# Pipe the output to dcagent:
-#   security-updates-alert >> /run/dcagent/dcagent.pipe
+# Pipe the output to a socket listener via netcat:
+#   security-updates-alert | nc -U /run/dcagent/dcagent.sock
 #
 # NOTE: Uses the existing apt cache — run `apt-get update` beforehand
 # (e.g. via a systemd timer or cron) to keep results current.
 #
 # Usage:
 #   Run from cron or a systemd timer, e.g. every hour:
-#     0 * * * * root apt-get -qq update && /usr/local/lib/dcagent/examples/actions/security-updates-alert >> /run/dcagent/dcagent.pipe
+#     0 * * * * root apt-get -qq update && /usr/local/lib/dcagent/examples/actions/security-updates-alert | nc -U $DCAGENT_LISTEN_SOCKET
 
 set -euo pipefail
 

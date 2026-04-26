@@ -2,8 +2,8 @@
 #
 # disk-status — report the highest disk usage to dcagent status.
 # Sends: status ${DISK_STATUS_KEY:-30_disk} <mount>:<pct>%   (worst partition only, e.g. "home:72%")
-# Pipe the output to dcagent:
-#   disk-status >> /run/dcagent/dcagent.pipe
+# Send the output to dcagent via socket:
+#   disk-status | nc -U /run/dcagent/dcagent.sock
 #
 # Configuration (environment variables or $DCAGENT_CONFIG_PATH/conf.d/disk-status.conf):
 #
@@ -12,7 +12,7 @@
 #
 # Usage:
 #   Run from cron or a systemd timer, e.g. every 5 minutes:
-#     */5 * * * * root /usr/local/lib/dcagent/examples/actions/disk-status >> /run/dcagent/dcagent.pipe
+#     */5 * * * * root /usr/bin/run-parts /etc/dcagent/cron/hourly.d 2>/dev/null | nc -U /run/dcagent/dcagent.sock
 
 set -euo pipefail
 

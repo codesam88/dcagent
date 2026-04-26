@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-temp-alert — print a line to stdout for each sensor temperature exceeding a threshold.
+temp-alert — report sensor temperatures exceeding a threshold to dcagent.
 Requires lm-sensors ('sensors' command).
 
-Pipe the output to dcagent:
-  temp-alert >> /run/dcagent/dcagent.pipe
+Pipe the output to a socket listener via netcat:
+  temp-alert | nc -U /run/dcagent/dcagent.sock
 
 Configuration (environment variables or $DCAGENT_CONFIG_PATH/conf.d/temp-alert.conf, as KEY=VALUE):
 
@@ -17,7 +17,7 @@ Configuration (environment variables or $DCAGENT_CONFIG_PATH/conf.d/temp-alert.c
 
 Usage:
   Run from cron or a systemd timer, e.g. every 5 minutes:
-    */5 * * * * root /usr/local/lib/dcagent/examples/actions/temp-alert >> /run/dcagent/dcagent.pipe
+    */5 * * * * root /usr/local/lib/dcagent/examples/actions/temp-alert | nc -U $DCAGENT_LISTEN_SOCKET
 """
 
 import json

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from dcagent.agent import _handle_alert_state, _pipe_do_alert
+from dcagent.agent import _handle_alert_state, _pipe_do_alert, _socket_dispatch
 from dcagent.bot import (
     APP_NAME,
     AgentError,
@@ -30,7 +30,8 @@ def test_parser_defaults():
     args = parser.parse_args(["serve"])
     assert args.subcommand == "serve"
     assert args.log_level == "info"
-    assert args.pipe_path is None
+    assert args.listen_socket is None
+    assert args.listen_addr is None
 
 
 def test_parser_init():
@@ -89,9 +90,22 @@ def test_parser_admin_with_invite():
     assert args.invite == "https://i.delta.chat/#ABC"
 
 
-def test_parser_serve_pipe():
-    args = _build_parser().parse_args(["serve", "--pipe-path", "/tmp/test.pipe"])
-    assert args.pipe_path == "/tmp/test.pipe"
+def test_parser_serve_socket_unix():
+    args = _build_parser().parse_args(["serve", "--listen-socket", "/tmp/test.sock"])
+    assert args.listen_socket == "/tmp/test.sock"
+    assert args.listen_addr is None
+
+
+def test_parser_serve_socket_inet():
+    args = _build_parser().parse_args(["serve", "--listen-addr", "0.0.0.0:5000"])
+    assert args.listen_addr == "0.0.0.0:5000"
+    assert args.listen_socket is None
+
+
+def test_parser_serve_socket_both():
+    args = _build_parser().parse_args(["serve", "--listen-socket", "/tmp/test.sock", "--listen-addr", "0.0.0.0:5000"])
+    assert args.listen_socket == "/tmp/test.sock"
+    assert args.listen_addr == "0.0.0.0:5000"
 
 
 def test_parser_log_file():
@@ -357,3 +371,49 @@ def test_get_account_no_accounts_raises():
     rpc.get_all_account_ids.return_value = []
     with pytest.raises(AgentError, match="No accounts"):
         _get_account(rpc)
+
+
+# ---------------------------------------------------------------------------
+# _socket_dispatch
+# ---------------------------------------------------------------------------
+
+
+def test_socket_dispatch_alert_success():
+    """Socket alert dispatch should return ok response."""
+    rpc = MagicMock()
+    rpc.get_config.return_value = "42"
+    alert_map = {}
+    result = _socket_dispatch("alert disk 95% full", accid=1, rpc=rpc, status_map={}, alert_map=alert_map)
+    assert "ok" in result
+    assert "alert sent" in result
+
+
+def test_socket_dispatch_alert_no_category():
+    """Socket alert without category should return error."""
+    result = _socket_dispatch("alert", accid=1, rpc=MagicMock(), status_map={}, alert_map={})
+    assert "error" in result
+    assert "requires category" in result
+
+
+def test_socket_dispatch_status_success():
+    """Socket status dispatch should return ok response."""
+    rpc = MagicMock()
+    status_map = {}
+    result = _socket_dispatch("status cpu 45%", accid=1, rpc=rpc, status_map=status_map, alert_map={})
+    assert "ok" in result
+    assert "updated" in result
+    assert status_map["cpu"] == "45%"
+
+
+def test_socket_dispatch_status_missing_args():
+    """Socket status without key and value should return error."""
+    result = _socket_dispatch("status", accid=1, rpc=MagicMock(), status_map={}, alert_map={})
+    assert "error" in result
+    assert "requires a key and value" in result
+
+
+def test_socket_dispatch_unknown_command():
+    """Socket dispatch with unknown command should return error."""
+    result = _socket_dispatch("unknown test", accid=1, rpc=MagicMock(), status_map={}, alert_map={})
+    assert "error" in result
+    assert "unknown command" in result

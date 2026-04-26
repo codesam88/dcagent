@@ -1,8 +1,8 @@
 """
-dcagent agent — chat handlers, pipe listener, and full run_bot() implementation.
+dcagent agent — chat handlers, socket listener, and full run_bot() implementation.
 
 Importing this module patches dcagent.bot.run_bot with the full implementation
-(message handlers + pipe listener). The entry point is main() which does that
+(message handlers + socket listener). The entry point is main() which does that
 patch then delegates to bot.main().
 
 To use dcagent without the agent layer (bare event loop), run bot.main() directly.
@@ -10,6 +10,7 @@ To use dcagent without the agent layer (bare event loop), run bot.main() directl
 
 import logging
 import os
+import socket
 import stat
 import threading
 import time
@@ -25,18 +26,18 @@ log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Pipe listener
+# Socket listener
 # ---------------------------------------------------------------------------
 
 
-def _ensure_pipe(path: str) -> None:
+def _ensure_unix_socket(path: str) -> None:
     if os.path.exists(path):
-        if not stat.S_ISFIFO(os.stat(path).st_mode):
-            log.warning("%s exists but is not a FIFO — removing it", path)
+        if not stat.S_ISSOCK(os.stat(path).st_mode):
+            log.warning("%s exists but is not a socket — removing it", path)
             os.remove(path)
-            os.mkfifo(path)
-    else:
-        os.mkfifo(path)
+        else:
+            os.remove(path)
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
 
 
 def _handle_alert_state(category: str, message: str, alert_map: dict[str, str]) -> str | None:
@@ -94,6 +95,33 @@ def _pipe_do_alert(args: str, accid: int, rpc: Rpc, alert_map: dict[str, str]) -
     alert_map[category] = message
 
 
+def _socket_do_alert(args: str, accid: int, rpc: Rpc, alert_map: dict[str, str]) -> str:
+    """Handle alert command: parse category and message, apply state logic, send if needed."""
+    parts = args.split(None, 1)
+    if len(parts) < 1:
+        return "error: alert command requires category"
+
+    category = parts[0]
+    message = parts[1] if len(parts) > 1 else ""
+
+    message_to_send = _handle_alert_state(category, message, alert_map)
+
+    if message_to_send is None:
+        log.debug("Alert suppressed (no state change): category=%r, message=%r", category, message)
+        return "ok: alert suppressed (no state change)"
+
+    chat_ids = _bot._get_alert_chats(rpc, accid)
+    if not chat_ids:
+        return "error: no alert chats configured"
+
+    for chat_id in chat_ids:
+        log.debug("Socket alert to channel %d: %r", chat_id, message_to_send[:80])
+        rpc.send_msg(accid, chat_id, MsgData(text=message_to_send))
+
+    alert_map[category] = message
+    return "ok: alert sent"
+
+
 def _pipe_do_status(args: str, accid: int, rpc: Rpc, status_map: dict) -> None:
     """Update status_map[key]=value and write space-joined values to selfstatus."""
     parts = args.split(None, 1)
@@ -105,6 +133,19 @@ def _pipe_do_status(args: str, accid: int, rpc: Rpc, status_map: dict) -> None:
     selfstatus = " ".join(v for _, v in sorted(status_map.items()))
     log.debug("Pipe status update: %s=%r -> selfstatus=%r", key, value, selfstatus)
     rpc.set_config(accid, "selfstatus", selfstatus)
+
+
+def _socket_do_status(args: str, accid: int, rpc: Rpc, status_map: dict) -> str:
+    """Update status_map[key]=value and write space-joined values to selfstatus."""
+    parts = args.split(None, 1)
+    if len(parts) < 2:
+        return "error: status command requires a key and value"
+    key, value = parts
+    status_map[key] = value
+    selfstatus = " ".join(v for _, v in sorted(status_map.items()))
+    log.debug("Socket status update: %s=%r -> selfstatus=%r", key, value, selfstatus)
+    rpc.set_config(accid, "selfstatus", selfstatus)
+    return "ok: status updated"
 
 
 def _pipe_dispatch(line: str, accid: int, rpc: Rpc, status_map: dict, alert_map: dict) -> None:
@@ -119,6 +160,18 @@ def _pipe_dispatch(line: str, accid: int, rpc: Rpc, status_map: dict, alert_map:
         log.warning("Unknown pipe command %r (line: %r)", cmd, line[:80])
 
 
+def _socket_dispatch(line: str, accid: int, rpc: Rpc, status_map: dict, alert_map: dict) -> str:
+    """Parse and dispatch a single socket line by its first word (command)."""
+    cmd, _, args = line.partition(" ")
+    args = args.strip()
+    if cmd == "alert":
+        return _socket_do_alert(args, accid, rpc, alert_map)
+    elif cmd == "status":
+        return _socket_do_status(args, accid, rpc, status_map)
+    else:
+        return f"error: unknown command {cmd!r}"
+
+
 def _pipe_listener(path: str, accid: int, rpc: Rpc, status_map: dict, alert_map: dict) -> None:
     """Blocking loop that reads command lines from the named pipe and dispatches them.
 
@@ -126,7 +179,7 @@ def _pipe_listener(path: str, accid: int, rpc: Rpc, status_map: dict, alert_map:
         alert <category> <message>    update alert state and send if changed
         status <key> <msg>            update status element key to msg
     """
-    _ensure_pipe(path)
+    _ensure_unix_socket(path)
     log.info("Waiting for messages on %s", path)
 
     while True:
@@ -140,6 +193,74 @@ def _pipe_listener(path: str, accid: int, rpc: Rpc, status_map: dict, alert_map:
                 except Exception as exc:
                     log.exception("Error handling pipe line %r: %s", line, exc)
         log.debug("Pipe read eof, waiting for next writer")
+
+
+def _handle_client(conn: socket.socket, accid: int, rpc: Rpc, status_map: dict, alert_map: dict) -> None:
+    """Handle a single client connection."""
+    try:
+        data = conn.recv(1024)
+        if data:
+            line = data.decode().strip()
+            if line:
+                try:
+                    response = _socket_dispatch(line, accid, rpc, status_map, alert_map)
+                    conn.sendall((response + "\n").encode())
+                except Exception as exc:
+                    log.exception("Error handling socket line %r: %s", line, exc)
+                    conn.sendall(b"error: internal error\n")
+    except Exception as exc:
+        log.debug("Client connection error: %s", exc)
+    finally:
+        conn.close()
+
+
+def _socket_listener_inet(host: str, port: int, accid: int, rpc: Rpc, status_map: dict, alert_map: dict) -> None:
+    """Blocking loop that accepts inet socket connections and handles clients."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind((host, port))
+    sock.listen(5)
+    log.info("Socket listener started on %s:%d (inet)", host, port)
+
+    try:
+        while True:
+            try:
+                conn, addr = sock.accept()
+                log.debug("Accepted connection from %s:%d", addr[0], addr[1])
+                threading.Thread(
+                    target=_handle_client,
+                    args=(conn, accid, rpc, status_map, alert_map),
+                    daemon=True,
+                ).start()
+            except Exception as exc:
+                log.exception("Error accepting connection: %s", exc)
+    finally:
+        sock.close()
+
+
+def _socket_listener_unix(path: str, accid: int, rpc: Rpc, status_map: dict, alert_map: dict) -> None:
+    """Blocking loop that accepts unix socket connections and handles clients."""
+    _ensure_unix_socket(path)
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.bind(path)
+    sock.listen(5)
+    log.info("Socket listener started on %s (unix)", path)
+
+    try:
+        while True:
+            try:
+                conn, _ = sock.accept()
+                threading.Thread(
+                    target=_handle_client,
+                    args=(conn, accid, rpc, status_map, alert_map),
+                    daemon=True,
+                ).start()
+            except Exception as exc:
+                log.exception("Error accepting connection: %s", exc)
+    finally:
+        sock.close()
+        if os.path.exists(path):
+            os.remove(path)
 
 
 # ---------------------------------------------------------------------------
@@ -314,14 +435,15 @@ def _on_leave(bot: Bot, accid: int, event) -> None:
 def run_bot(
     rpc: Rpc,
     accid: int,
-    pipe_path: str,
+    listen_socket: str,
+    listen_addr: str,
     heartbeat_interval: int,
     alert_dir: str = "",
     alert_interval: int = 60,
     status_dir: str = "",
     status_interval: int = 60,
 ) -> None:
-    """Full implementation: message handlers + optional pipe listener + heartbeat."""
+    """Full implementation: message handlers + optional socket listeners + heartbeat."""
     addrs = get_addrs(rpc, accid)
     our_addr = addrs[0] if addrs else ""
     log.info("Listening at: %s", ", ".join(addrs))
@@ -340,16 +462,29 @@ def run_bot(
     ]
     bot = Bot(rpc, hooks, logger=log)
 
-    if pipe_path:
-        status_map: dict[str, str] = {}
-        alert_map: dict[str, str] = {}
+    status_map: dict[str, str] = {}
+    alert_map: dict[str, str] = {}
+
+    if listen_socket:
         threading.Thread(
-            target=_pipe_listener,
-            args=(pipe_path, accid, rpc, status_map, alert_map),
-            name="pipe-listener",
+            target=_socket_listener_unix,
+            args=(listen_socket, accid, rpc, status_map, alert_map),
+            name="socket-unix",
             daemon=True,
         ).start()
-        log.info("Pipe listener started on %s", pipe_path)
+
+    if listen_addr:
+        host, port_str = listen_addr.rsplit(":", 1)
+        try:
+            port = int(port_str)
+        except ValueError:
+            raise ValueError(f"Invalid inet socket address: {listen_addr}, expected host:port")
+        threading.Thread(
+            target=_socket_listener_inet,
+            args=(host, port, accid, rpc, status_map, alert_map),
+            name="socket-inet",
+            daemon=True,
+        ).start()
 
     if _bot._get_heartbeat_chats(rpc, accid):
         hb_state.start(rpc, accid, our_addr)

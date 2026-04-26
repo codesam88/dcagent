@@ -14,12 +14,12 @@ error condition.
 Dependencies:
   distro-info    apt install distro-info
 
-Pipe the output to dcagent:
-  distro-info >> /run/dcagent/dcagent.pipe
+Pipe the output to a socket listener via netcat:
+  distro-info | nc -U /run/dcagent/dcagent.sock
 
 Usage:
   Run from a systemd timer or cron, e.g. daily:
-    0 6 * * * root /usr/local/lib/dcagent/examples/actions/distro-info >> /run/dcagent/dcagent.pipe
+    0 6 * * * root /usr/local/lib/dcagent/examples/actions/distro-info | nc -U $DCAGENT_LISTEN_SOCKET
 """
 
 import os

@@ -3,7 +3,7 @@ dcagent bot — lifecycle commands, RPC infrastructure, and CLI entry point.
 
 Provides the do_* lifecycle commands (init, config, alert, admin, serve),
 shared helpers, and main(). run_bot() has a minimal default implementation
-that agent.py overrides with the full handler/pipe stack.
+that agent.py overrides with the full handler/socket stack.
 
 Usage:
     dcagent [--account-db PATH] [--log-level LEVEL] [--log-file PATH] <subcommand> [args]
@@ -15,9 +15,9 @@ Subcommands:
     heartbeat [INVITE]     – print heartbeat-group invite link, or join one via SecureJoin
     admin [INVITE]         – print admin-group invite link, or join one via SecureJoin
     status                 – print account status and alert/admin invite links
-    serve [--pipe-path PATH]    – run the bot (event loop + optional pipe listener)
+    serve [--listen-socket PATH] [--listen-addr ADDR]    – run the bot (event loop + optional socket listeners)
 
-Pipe input format:
+Socket input format:
     <command> [args...]
 
     alert <category> [message]   update alert state; only sends if state changed or category=""
@@ -402,10 +402,12 @@ def do_serve(rpc: Rpc, args: Namespace) -> None:
     """Start the bot event loop."""
     accid = _get_account(rpc)
     _ensure_configured(rpc, accid)
+
     run_bot(
         rpc,
         accid,
-        args.pipe_path,
+        args.listen_socket,
+        args.listen_addr,
         args.heartbeat,
         args.alert_dir,
         args.alert_interval,
@@ -424,7 +426,8 @@ def do_serve(rpc: Rpc, args: Namespace) -> None:
 def run_bot(
     rpc: Rpc,
     accid: int,
-    pipe_path: str,
+    listen_socket: str,
+    listen_addr: str,
     heartbeat_interval: int,
     alert_dir: str = "",
     alert_interval: int = 60,
@@ -502,10 +505,16 @@ def _build_parser() -> ArgumentParser:
 
     p = sub.add_parser("serve", help="run the bot")
     p.add_argument(
-        "--pipe-path",
+        "--listen-socket",
         metavar="PATH",
-        default=os.environ.get("DCAGENT_PIPE_PATH"),
-        help="path to Unix named pipe for external commands (env: DCAGENT_PIPE_PATH)",
+        default=os.environ.get("DCAGENT_LISTEN_SOCKET"),
+        help="Unix domain socket path (env: DCAGENT_LISTEN_SOCKET)",
+    )
+    p.add_argument(
+        "--listen-addr",
+        metavar="ADDR",
+        default=os.environ.get("DCAGENT_LISTEN_ADDR"),
+        help="inet socket address host:port (env: DCAGENT_LISTEN_ADDR)",
     )
     p.add_argument(
         "--heartbeat",

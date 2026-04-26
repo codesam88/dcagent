@@ -4,8 +4,8 @@ temp-status — report the highest sensor temperature to dcagent status.
 Sends: status ${TEMP_STATUS_KEY:-20_temp} <N>°C   (maximum reading across all monitored sensors)
 Requires lm-sensors ('sensors' command).
 
-Pipe the output to dcagent:
-  temp-status >> /run/dcagent/dcagent.pipe
+Pipe the output to a socket listener via netcat:
+  temp-status | nc -U /run/dcagent/dcagent.sock
 
 Configuration (environment variables or $DCAGENT_CONFIG_PATH/conf.d/temp-status.conf, as KEY=VALUE):
 
@@ -17,7 +17,7 @@ Configuration (environment variables or $DCAGENT_CONFIG_PATH/conf.d/temp-status.
 
 Usage:
   Run from cron or a systemd timer, e.g. every 5 minutes:
-    */5 * * * * root /usr/local/lib/dcagent/examples/actions/temp-status >> /run/dcagent/dcagent.pipe
+    */5 * * * * root /usr/local/lib/dcagent/examples/actions/temp-status | nc -U $DCAGENT_LISTEN_SOCKET
 """
 
 import json
