@@ -108,46 +108,18 @@ def _socket_do_status(args: str, accid: int, rpc: Rpc, status_map: dict) -> str:
 
 
 def _socket_do_config(args: str, accid: int, rpc: Rpc) -> str:
-    """Get or set configuration values, or dump all config when no args."""
+    """Get or set configuration values using shared implementation."""
     parts = args.split(None, 1)
-
-    # No args: print version, account info, and all config keys/values
-    if not parts or not parts[0]:
-        try:
-            version = _bot._get_version()
-            configured = rpc.is_configured(accid)
-            addr = rpc.get_config(accid, "addr") or "(no address)"
-            displayname = rpc.get_config(accid, "displayname") or ""
-            name_part = f" ({displayname})" if displayname else ""
-            status = "configured" if configured else "not configured"
-
-            output = [
-                f"dcagent {version}",
-                f"Account #{accid}: {addr}{name_part} [{status}]",
-            ]
-
-            # Dump all config keys
-            keys = rpc.get_config(accid, "sys.config_keys") or ""
-            if keys:
-                for key in keys.split():
-                    value = rpc.get_config(accid, key)
-                    output.append(f"{key}={value!r}")
-
-            return "ok: " + "\n".join(output)
-        except Exception as exc:
-            log.exception("Config dump error: %s", exc)
-            return f"error: config dump error: {exc}"
-
-    # With args: get or set specific key
-    key = parts[0]
+    key = parts[0] if parts and parts[0] else None
     value = parts[1] if len(parts) > 1 else None
+
     try:
-        if value is not None:
-            rpc.set_config(accid, key, value)
-        result = rpc.get_config(accid, key)
-        return f"ok: {key}={result!r}"
+        # For socket, always include header when dumping all config (no key)
+        include_header = key is None
+        lines = _bot._get_config_output(rpc, accid, key=key, value=value, include_header=include_header)
+        return "ok: " + "\n".join(lines)
     except Exception as exc:
-        log.exception("Config error for key %r: %s", key, exc)
+        log.exception("Config error: %s", exc)
         return f"error: config error: {exc}"
 
 

@@ -294,21 +294,51 @@ def do_init(rpc: Rpc, args: Namespace) -> None:
     log.info("Account #%d configured: %s", accid, ", ".join(addrs))
 
 
+def _get_config_output(
+    rpc: Rpc, accid: int, key: str | None = None, value: str | None = None, include_header: bool = False
+) -> list[str]:
+    """Shared implementation for config command.
+
+    Returns list of output lines for displaying/getting/setting configuration.
+    If include_header is True, includes version and account info at the start.
+    """
+    output = []
+
+    if include_header:
+        version = _get_version()
+        configured = rpc.is_configured(accid)
+        addr = rpc.get_config(accid, "addr") or "(no address)"
+        displayname = rpc.get_config(accid, "displayname") or ""
+        name_part = f" ({displayname})" if displayname else ""
+        status = "configured" if configured else "not configured"
+        output.append(f"dcagent {version}")
+        output.append(f"Account #{accid}: {addr}{name_part} [{status}]")
+
+    if key:
+        # Get or set specific key
+        if value is not None:
+            rpc.set_config(accid, key, value)
+        result = rpc.get_config(accid, key)
+        output.append(f"{key}={result!r}")
+    else:
+        # Dump all config keys
+        keys = rpc.get_config(accid, "sys.config_keys") or ""
+        for k in keys.split():
+            v = rpc.get_config(accid, k)
+            output.append(f"{k}={v!r}")
+
+    return output
+
+
 def do_config(rpc: Rpc, args: Namespace) -> None:
     """Get or set account configuration values."""
     accid = _get_account(rpc)
-    if args.value is not None:
-        rpc.set_config(accid, args.key, args.value)
-    if args.key:
-        try:
-            value = rpc.get_config(accid, args.key)
-            print(f"{args.key}={value!r}")
-        except JsonRpcError as exc:
-            raise AgentError(f"Unknown configuration key: {args.key}") from exc
-    else:
-        keys = rpc.get_config(accid, "sys.config_keys") or ""
-        for key in keys.split():
-            print(f"{key}={rpc.get_config(accid, key)!r}")
+    try:
+        lines = _get_config_output(rpc, accid, key=args.key, value=args.value)
+        for line in lines:
+            print(line)
+    except JsonRpcError as exc:
+        raise AgentError(f"Unknown configuration key: {args.key}") from exc
 
 
 def do_alert(rpc: Rpc, args: Namespace) -> None:
