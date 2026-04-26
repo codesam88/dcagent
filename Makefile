@@ -38,7 +38,7 @@ check: test-scripts
 # Run integration tests against a live chatmail server (runs unit tests first)
 test-online:
 	pgrep dcagent && (echo "WARNING: dcagent instances running in background" && false) || true
-	timeout 40 run-parts tests/integration
+	timeout 80 run-parts tests/integration
 
 # Run all tests
 test: check test-online
