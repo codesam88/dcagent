@@ -15,17 +15,17 @@ wait_for_log "$AGENT_LOG" "Listening at" "$TIMEOUT"
 wait_for_file "$AGENT_PIPE" 10
 
 echo "==> Setting status load=high (single key)"
-printf 'status load high\n' | nc -U "$AGENT_PIPE"
+printf 'status load high\nquit\n' | nc -U "$AGENT_PIPE"
 wait_for_log "$AGENT_LOG" "selfstatus='high'" "$TIMEOUT"
 echo "OK: single key"
 
 echo "==> Adding status disk=93% (should sort: disk before load)"
-printf 'status disk 93%%\n' | nc -U "$AGENT_PIPE"
+printf 'status disk 93%%\nquit\n' | nc -U "$AGENT_PIPE"
 wait_for_log "$AGENT_LOG" "selfstatus='93% high'" "$TIMEOUT"
 echo "OK: two keys ordered alphabetically"
 
 echo "==> Updating status load=normal (disk order preserved)"
-printf 'status load normal\n' | nc -U "$AGENT_PIPE"
+printf 'status load normal\nquit\n' | nc -U "$AGENT_PIPE"
 wait_for_log "$AGENT_LOG" "selfstatus='93% normal'" "$TIMEOUT"
 echo "OK: existing key updated"
 

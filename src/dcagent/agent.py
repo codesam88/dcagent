@@ -120,12 +120,23 @@ def _socket_dispatch(line: str, accid: int, rpc: Rpc, status_map: dict, alert_ma
 
 
 def _handle_client(conn: socket.socket, accid: int, rpc: Rpc, status_map: dict, alert_map: dict) -> None:
-    """Handle a single client connection."""
+    """Handle a single client connection, buffering input by newline."""
+    buffer = ""
     try:
-        data = conn.recv(1024)
-        if data:
-            line = data.decode().strip()
-            if line:
+        while True:
+            data = conn.recv(1024)
+            if not data:
+                break
+            buffer += data.decode()
+            # Process all complete lines (ending with \n)
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+                line = line.strip()
+                if not line:
+                    continue
+                if line == "quit":
+                    conn.sendall(b"ok: goodbye\n")
+                    return
                 try:
                     response = _socket_dispatch(line, accid, rpc, status_map, alert_map)
                     conn.sendall((response + "\n").encode())
