@@ -107,6 +107,23 @@ def _socket_do_status(args: str, accid: int, rpc: Rpc, status_map: dict) -> str:
     return "ok: status updated"
 
 
+def _socket_do_config(args: str, accid: int, rpc: Rpc) -> str:
+    """Get or set configuration values."""
+    parts = args.split(None, 1)
+    if not parts:
+        return "error: config command requires a key, optionally followed by a value"
+    key = parts[0]
+    value = parts[1] if len(parts) > 1 else None
+    try:
+        if value is not None:
+            rpc.set_config(accid, key, value)
+        result = rpc.get_config(accid, key)
+        return f"ok: {key}={result!r}"
+    except Exception as exc:
+        log.exception("Config error for key %r: %s", key, exc)
+        return f"error: config error: {exc}"
+
+
 def _socket_dispatch(line: str, accid: int, rpc: Rpc, status_map: dict, alert_map: dict) -> str:
     """Parse and dispatch a single socket line by its first word (command)."""
     cmd, _, args = line.partition(" ")
@@ -115,6 +132,8 @@ def _socket_dispatch(line: str, accid: int, rpc: Rpc, status_map: dict, alert_ma
         return _socket_do_alert(args, accid, rpc, alert_map)
     elif cmd == "status":
         return _socket_do_status(args, accid, rpc, status_map)
+    elif cmd == "config":
+        return _socket_do_config(args, accid, rpc)
     else:
         return f"error: unknown command {cmd!r}"
 

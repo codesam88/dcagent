@@ -353,3 +353,31 @@ def test_socket_dispatch_unknown_command():
     result = _socket_dispatch("unknown test", accid=1, rpc=MagicMock(), status_map={}, alert_map={})
     assert "error" in result
     assert "unknown command" in result
+
+
+def test_socket_dispatch_config_get():
+    """Socket dispatch config get should return the configuration value."""
+    rpc = MagicMock()
+    rpc.get_config.return_value = "example@domain.com"
+    result = _socket_dispatch("config addr", accid=1, rpc=rpc, status_map={}, alert_map={})
+    assert "ok:" in result
+    assert "addr='example@domain.com'" in result
+    rpc.get_config.assert_called_once_with(1, "addr")
+
+
+def test_socket_dispatch_config_set():
+    """Socket dispatch config set should update and return the value."""
+    rpc = MagicMock()
+    rpc.get_config.return_value = "updated_value"
+    result = _socket_dispatch("config mykey newvalue", accid=1, rpc=rpc, status_map={}, alert_map={})
+    assert "ok:" in result
+    assert "mykey='updated_value'" in result
+    rpc.set_config.assert_called_once_with(1, "mykey", "newvalue")
+    rpc.get_config.assert_called_once_with(1, "mykey")
+
+
+def test_socket_dispatch_config_missing_args():
+    """Socket dispatch config without key should return error."""
+    result = _socket_dispatch("config", accid=1, rpc=MagicMock(), status_map={}, alert_map={})
+    assert "error" in result
+    assert "requires a key" in result
