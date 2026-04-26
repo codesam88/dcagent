@@ -376,8 +376,22 @@ def test_socket_dispatch_config_set():
     rpc.get_config.assert_called_once_with(1, "mykey")
 
 
-def test_socket_dispatch_config_missing_args():
-    """Socket dispatch config without key should return error."""
-    result = _socket_dispatch("config", accid=1, rpc=MagicMock(), status_map={}, alert_map={})
-    assert "error" in result
-    assert "requires a key" in result
+def test_socket_dispatch_config_dump_all():
+    """Socket dispatch config without key should dump all config."""
+
+    rpc = MagicMock()
+    rpc.is_configured.return_value = True
+    rpc.get_config.side_effect = lambda accid, key: {
+        "addr": "test@example.com",
+        "displayname": "TestBot",
+        "sys.config_keys": "addr displayname selfstatus",
+        "selfstatus": "online",
+    }.get(key, "")
+
+    result = _socket_dispatch("config", accid=1, rpc=rpc, status_map={}, alert_map={})
+    assert "ok:" in result
+    assert "Account #1:" in result
+    assert "test@example.com" in result
+    assert "TestBot" in result
+    assert "configured" in result
+    assert "selfstatus='online'" in result

@@ -108,10 +108,37 @@ def _socket_do_status(args: str, accid: int, rpc: Rpc, status_map: dict) -> str:
 
 
 def _socket_do_config(args: str, accid: int, rpc: Rpc) -> str:
-    """Get or set configuration values."""
+    """Get or set configuration values, or dump all config when no args."""
     parts = args.split(None, 1)
-    if not parts:
-        return "error: config command requires a key, optionally followed by a value"
+
+    # No args: print version, account info, and all config keys/values
+    if not parts or not parts[0]:
+        try:
+            version = _bot._get_version()
+            configured = rpc.is_configured(accid)
+            addr = rpc.get_config(accid, "addr") or "(no address)"
+            displayname = rpc.get_config(accid, "displayname") or ""
+            name_part = f" ({displayname})" if displayname else ""
+            status = "configured" if configured else "not configured"
+
+            output = [
+                f"dcagent {version}",
+                f"Account #{accid}: {addr}{name_part} [{status}]",
+            ]
+
+            # Dump all config keys
+            keys = rpc.get_config(accid, "sys.config_keys") or ""
+            if keys:
+                for key in keys.split():
+                    value = rpc.get_config(accid, key)
+                    output.append(f"{key}={value!r}")
+
+            return "ok: " + "\n".join(output)
+        except Exception as exc:
+            log.exception("Config dump error: %s", exc)
+            return f"error: config dump error: {exc}"
+
+    # With args: get or set specific key
     key = parts[0]
     value = parts[1] if len(parts) > 1 else None
     try:
