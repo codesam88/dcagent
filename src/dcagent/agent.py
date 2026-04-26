@@ -67,34 +67,6 @@ def _handle_alert_state(category: str, message: str, alert_map: dict[str, str]) 
     return None
 
 
-def _pipe_do_alert(args: str, accid: int, rpc: Rpc, alert_map: dict[str, str]) -> None:
-    """Handle alert command: parse category and message, apply state logic, send if needed."""
-    parts = args.split(None, 1)
-    if len(parts) < 1:
-        log.warning("pipe 'alert' command requires category, got empty string")
-        return
-
-    category = parts[0]
-    message = parts[1] if len(parts) > 1 else ""
-
-    message_to_send = _handle_alert_state(category, message, alert_map)
-
-    if message_to_send is None:
-        log.debug("Alert suppressed (no state change): category=%r, message=%r", category, message)
-        return
-
-    chat_ids = _bot._get_alert_chats(rpc, accid)
-    if not chat_ids:
-        log.warning("pipe alert received but no alert chats configured")
-        return
-
-    for chat_id in chat_ids:
-        log.debug("Pipe alert to channel %d: %r", chat_id, message_to_send[:80])
-        rpc.send_msg(accid, chat_id, MsgData(text=message_to_send))
-
-    alert_map[category] = message
-
-
 def _socket_do_alert(args: str, accid: int, rpc: Rpc, alert_map: dict[str, str]) -> str:
     """Handle alert command: parse category and message, apply state logic, send if needed."""
     parts = args.split(None, 1)
@@ -122,19 +94,6 @@ def _socket_do_alert(args: str, accid: int, rpc: Rpc, alert_map: dict[str, str])
     return "ok: alert sent"
 
 
-def _pipe_do_status(args: str, accid: int, rpc: Rpc, status_map: dict) -> None:
-    """Update status_map[key]=value and write space-joined values to selfstatus."""
-    parts = args.split(None, 1)
-    if len(parts) < 2:
-        log.warning("pipe 'status' command requires a key and value, got: %r", args)
-        return
-    key, value = parts
-    status_map[key] = value
-    selfstatus = " ".join(v for _, v in sorted(status_map.items()))
-    log.debug("Pipe status update: %s=%r -> selfstatus=%r", key, value, selfstatus)
-    rpc.set_config(accid, "selfstatus", selfstatus)
-
-
 def _socket_do_status(args: str, accid: int, rpc: Rpc, status_map: dict) -> str:
     """Update status_map[key]=value and write space-joined values to selfstatus."""
     parts = args.split(None, 1)
@@ -148,18 +107,6 @@ def _socket_do_status(args: str, accid: int, rpc: Rpc, status_map: dict) -> str:
     return "ok: status updated"
 
 
-def _pipe_dispatch(line: str, accid: int, rpc: Rpc, status_map: dict, alert_map: dict) -> None:
-    """Parse and dispatch a single pipe line by its first word (command)."""
-    cmd, _, args = line.partition(" ")
-    args = args.strip()
-    if cmd == "alert":
-        _pipe_do_alert(args, accid, rpc, alert_map)
-    elif cmd == "status":
-        _pipe_do_status(args, accid, rpc, status_map)
-    else:
-        log.warning("Unknown pipe command %r (line: %r)", cmd, line[:80])
-
-
 def _socket_dispatch(line: str, accid: int, rpc: Rpc, status_map: dict, alert_map: dict) -> str:
     """Parse and dispatch a single socket line by its first word (command)."""
     cmd, _, args = line.partition(" ")
@@ -170,29 +117,6 @@ def _socket_dispatch(line: str, accid: int, rpc: Rpc, status_map: dict, alert_ma
         return _socket_do_status(args, accid, rpc, status_map)
     else:
         return f"error: unknown command {cmd!r}"
-
-
-def _pipe_listener(path: str, accid: int, rpc: Rpc, status_map: dict, alert_map: dict) -> None:
-    """Blocking loop that reads command lines from the named pipe and dispatches them.
-
-    Commands:
-        alert <category> <message>    update alert state and send if changed
-        status <key> <msg>            update status element key to msg
-    """
-    _ensure_unix_socket(path)
-    log.info("Waiting for messages on %s", path)
-
-    while True:
-        with open(path) as pipe:
-            for line in pipe:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    _pipe_dispatch(line, accid, rpc, status_map, alert_map)
-                except Exception as exc:
-                    log.exception("Error handling pipe line %r: %s", line, exc)
-        log.debug("Pipe read eof, waiting for next writer")
 
 
 def _handle_client(conn: socket.socket, accid: int, rpc: Rpc, status_map: dict, alert_map: dict) -> None:
