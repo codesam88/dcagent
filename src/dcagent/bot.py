@@ -294,25 +294,13 @@ def do_init(rpc: Rpc, args: Namespace) -> None:
     log.info("Account #%d configured: %s", accid, ", ".join(addrs))
 
 
-def _get_config_output(
-    rpc: Rpc, accid: int, key: str | None = None, value: str | None = None, include_header: bool = False
-) -> list[str]:
+def _get_config_output(rpc: Rpc, accid: int, key: str | None = None, value: str | None = None) -> list[str]:
     """Shared implementation for config command.
 
     Returns list of output lines for displaying/getting/setting configuration.
-    If include_header is True, includes version and account info at the start.
+    When key is None, dumps all config keys. When key is provided, gets/sets that key.
     """
     output = []
-
-    if include_header:
-        version = _get_version()
-        configured = rpc.is_configured(accid)
-        addr = rpc.get_config(accid, "addr") or "(no address)"
-        displayname = rpc.get_config(accid, "displayname") or ""
-        name_part = f" ({displayname})" if displayname else ""
-        status = "configured" if configured else "not configured"
-        output.append(f"dcagent {version}")
-        output.append(f"Account #{accid}: {addr}{name_part} [{status}]")
 
     if key:
         # Get or set specific key
@@ -333,6 +321,7 @@ def _get_config_output(
 def do_config(rpc: Rpc, args: Namespace) -> None:
     """Get or set account configuration values."""
     accid = _get_account(rpc)
+
     try:
         lines = _get_config_output(rpc, accid, key=args.key, value=args.value)
         for line in lines:
@@ -490,7 +479,7 @@ def _build_parser() -> ArgumentParser:
         formatter_class=lambda prog: __import__("argparse").RawDescriptionHelpFormatter(prog),
     )
 
-    parser.add_argument("--version", action="version", version=f"%(prog)s {_get_version()}")
+    parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {_get_version()}")
     parser.add_argument(
         "--account-db",
         "-c",

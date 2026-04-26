@@ -377,10 +377,9 @@ def test_socket_dispatch_config_set():
 
 
 def test_socket_dispatch_config_dump_all():
-    """Socket dispatch config without key should dump all config."""
+    """Socket dispatch config without key should dump all config keys."""
 
     rpc = MagicMock()
-    rpc.is_configured.return_value = True
     rpc.get_config.side_effect = lambda accid, key: {
         "addr": "test@example.com",
         "displayname": "TestBot",
@@ -390,8 +389,68 @@ def test_socket_dispatch_config_dump_all():
 
     result = _socket_dispatch("config", accid=1, rpc=rpc, status_map={}, alert_map={})
     assert "ok:" in result
-    assert "Account #1:" in result
-    assert "test@example.com" in result
-    assert "TestBot" in result
-    assert "configured" in result
+    assert "addr='test@example.com'" in result
+    assert "displayname='TestBot'" in result
     assert "selfstatus='online'" in result
+
+
+def test_socket_dispatch_version():
+    """Socket dispatch version should return the version string."""
+    rpc = MagicMock()
+    result = _socket_dispatch("version", accid=1, rpc=rpc, status_map={}, alert_map={})
+    assert "ok:" in result
+    assert "dcagent" in result
+
+
+# Chat command handlers
+def test_on_version_sends_version_string():
+    """Chat /version command should send version string."""
+    from dcagent.agent import _on_version
+
+    bot = MagicMock()
+    event = MagicMock()
+    event.msg.chat_id = 42
+
+    _on_version(bot, accid=1, event=event)
+
+    bot.rpc.send_msg.assert_called_once()
+    call_args = bot.rpc.send_msg.call_args[0]
+    assert call_args[0] == 1  # accid
+    assert call_args[1] == 42  # chat_id
+    msg_data = call_args[2]
+    assert "dcagent" in msg_data.text
+
+
+def test_on_help_includes_version_command():
+    """Chat /help command should list /version command."""
+    from dcagent.agent import _on_help
+
+    bot = MagicMock()
+    bot.rpc.get_config.return_value = "TestBot"
+    event = MagicMock()
+    event.msg.chat_id = 42
+
+    _on_help(bot, accid=1, event=event)
+
+    bot.rpc.send_msg.assert_called_once()
+    call_args = bot.rpc.send_msg.call_args[0]
+    msg_data = call_args[2]
+    assert "/version" in msg_data.text
+
+
+def test_on_ping_responds_with_pong():
+    """Chat /ping command should respond with pong."""
+    from dcagent.agent import _on_ping
+
+    bot = MagicMock()
+    event = MagicMock()
+    event.msg.chat_id = 42
+
+    _on_ping(bot, accid=1, event=event)
+
+    bot.rpc.send_msg.assert_called_once()
+    call_args = bot.rpc.send_msg.call_args[0]
+    assert call_args[0] == 1  # accid
+    assert call_args[1] == 42  # chat_id
+    msg_data = call_args[2]
+    assert "Pong" in msg_data.text or "🏓" in msg_data.text

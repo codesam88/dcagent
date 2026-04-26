@@ -114,13 +114,21 @@ def _socket_do_config(args: str, accid: int, rpc: Rpc) -> str:
     value = parts[1] if len(parts) > 1 else None
 
     try:
-        # For socket, always include header when dumping all config (no key)
-        include_header = key is None
-        lines = _bot._get_config_output(rpc, accid, key=key, value=value, include_header=include_header)
+        lines = _bot._get_config_output(rpc, accid, key=key, value=value)
         return "ok: " + "\n".join(lines)
     except Exception as exc:
         log.exception("Config error: %s", exc)
         return f"error: config error: {exc}"
+
+
+def _socket_do_version(args: str, accid: int, rpc: Rpc) -> str:
+    """Return the dcagent version string."""
+    try:
+        version = _bot._get_version()
+        return f"ok: dcagent {version}"
+    except Exception as exc:
+        log.exception("Version error: %s", exc)
+        return f"error: version error: {exc}"
 
 
 def _socket_dispatch(line: str, accid: int, rpc: Rpc, status_map: dict, alert_map: dict) -> str:
@@ -133,6 +141,8 @@ def _socket_dispatch(line: str, accid: int, rpc: Rpc, status_map: dict, alert_ma
         return _socket_do_status(args, accid, rpc, status_map)
     elif cmd == "config":
         return _socket_do_config(args, accid, rpc)
+    elif cmd == "version":
+        return _socket_do_version(args, accid, rpc)
     else:
         return f"error: unknown command {cmd!r}"
 
@@ -245,18 +255,25 @@ def _on_help(bot: Bot, accid: int, event) -> None:
     help_text = (
         f"👋 Hi! I am {bot_name}.\n\n"
         "Commands:\n"
-        "  /help   – show this\n"
-        "  /ping   – check I'm alive\n"
-        "  /alert  – manage alert chat (admin only)\n"
-        "  /admin  – manage admin chat (admin only)\n"
-        "  /chats  – list managed chats (admin only)\n"
-        "  /leave  – leave a chat (admin only)"
+        "  /help    – show this\n"
+        "  /ping    – check I'm alive\n"
+        "  /version – show dcagent version\n"
+        "  /alert   – manage alert chat (admin only)\n"
+        "  /admin   – manage admin chat (admin only)\n"
+        "  /chats   – list managed chats (admin only)\n"
+        "  /leave   – leave a chat (admin only)"
     )
     bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=help_text))
 
 
 def _on_ping(bot: Bot, accid: int, event) -> None:
     bot.rpc.send_msg(accid, event.msg.chat_id, MsgData(text="Pong! 🏓"))
+
+
+def _on_version(bot: Bot, accid: int, event) -> None:
+    """Handle /version command: show dcagent version."""
+    version = _bot._get_version()
+    bot.rpc.send_msg(accid, event.msg.chat_id, MsgData(text=f"dcagent {version}"))
 
 
 def _on_alert(bot: Bot, accid: int, event) -> None:
@@ -407,6 +424,7 @@ def run_bot(
         (_on_new_message, events.NewMessage(is_bot=None)),
         (_on_help, events.NewMessage(command="/help")),
         (_on_ping, events.NewMessage(command="/ping")),
+        (_on_version, events.NewMessage(command="/version")),
         (_on_alert, events.NewMessage(command="/alert")),
         (_on_admin, events.NewMessage(command="/admin")),
         (_on_chats, events.NewMessage(command="/chats")),
