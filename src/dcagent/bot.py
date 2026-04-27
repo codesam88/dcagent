@@ -330,52 +330,6 @@ def do_config(rpc: Rpc, args: Namespace) -> None:
         raise AgentError(f"Unknown configuration key: {args.key}") from exc
 
 
-def do_alert(rpc: Rpc, args: Namespace) -> None:
-    """Print the alert-group invite link, or join a chat and add it to the alert group.
-
-    Without an invite argument: prints the SecureJoin invite link for this bot's
-    alert group, creating the group first if it doesn't exist. Anyone who joins
-    will receive pipe messages.
-
-    With an invite argument: joins the chat via SecureJoin and registers it in
-    the alert group (ui.alert_chats). The pipe listener will send messages to
-    all chats in this group.
-    """
-    accid = _get_account(rpc)
-    _ensure_configured(rpc, accid)
-
-    if not args.invite:
-        chatid = _get_or_create_alert_chat(rpc, accid)
-        print(rpc.get_chat_securejoin_qr_code(accid, chatid))
-        return
-
-    chat_id = _securejoin(rpc, accid, args.invite)
-    _add_alert_chat(rpc, accid, chat_id)
-    log.info("Joined alert chat (chat_id=%s)", chat_id)
-
-
-def do_heartbeat(rpc: Rpc, args: Namespace) -> None:
-    """Print the heartbeat-group invite link, or join one via SecureJoin.
-
-    Without an invite argument: prints the invite link for this bot's heartbeat
-    group, creating the group first if it doesn't exist.
-
-    With an invite argument: joins the chat via SecureJoin and registers it as
-    the heartbeat chat (ui.heartbeat_chats).
-    """
-    accid = _get_account(rpc)
-    _ensure_configured(rpc, accid)
-
-    if not args.invite:
-        chatid = _get_or_create_heartbeat_chat(rpc, accid)
-        print(rpc.get_chat_securejoin_qr_code(accid, chatid))
-        return
-
-    chat_id = _securejoin(rpc, accid, args.invite)
-    _add_heartbeat_chat(rpc, accid, chat_id)
-    log.info("Joined heartbeat chat (chat_id=%s)", chat_id)
-
-
 def do_admin(rpc: Rpc, args: Namespace) -> None:
     """Print the admin-group invite link, or join an existing one via SecureJoin.
 
@@ -396,25 +350,6 @@ def do_admin(rpc: Rpc, args: Namespace) -> None:
     chat_id = _securejoin(rpc, accid, args.invite)
     _add_admin_chat(rpc, accid, chat_id)
     log.info("Joined admin channel (chat_id=%s)", chat_id)
-
-
-def do_status(rpc: Rpc, args: Namespace) -> None:
-    """Print account status"""
-    print(f"dcagent {_get_version()}")
-    accounts = rpc.get_all_account_ids()
-    if not accounts:
-        print("no accounts configured")
-        return
-    accid = accounts[0]
-    configured = rpc.is_configured(accid)
-    addr = rpc.get_config(accid, "addr") or "(no address)"
-    displayname = rpc.get_config(accid, "displayname") or ""
-    name_part = f" ({displayname})" if displayname else ""
-    status = "configured" if configured else "not configured"
-    print(f"Account #{accid}: {addr}{name_part} [{status}]")
-
-    if not configured:
-        return
 
 
 def do_serve(rpc: Rpc, args: Namespace) -> None:
@@ -515,12 +450,6 @@ def _build_parser() -> ArgumentParser:
     p.add_argument("key", nargs="?", help="config key")
     p.add_argument("value", nargs="?", help="value to set")
 
-    p = sub.add_parser("alert", help="print personal invite link, or join a chat and add it to the alert group")
-    p.add_argument("invite", nargs="?", metavar="INVITE", help="if given, join this chat via SecureJoin")
-
-    p = sub.add_parser("heartbeat", help="print heartbeat-group invite link, or join one via SecureJoin")
-    p.add_argument("invite", nargs="?", metavar="INVITE", help="if given, join this chat via SecureJoin")
-
     p = sub.add_parser("admin", help="print admin-group invite link, or join one via SecureJoin")
     p.add_argument("invite", nargs="?", metavar="INVITE", help="if given, join this admin channel via SecureJoin")
 
@@ -576,8 +505,6 @@ def _build_parser() -> ArgumentParser:
         help="enable test mode with dcmsg socket command",
     )
 
-    sub.add_parser("status", help="print bot/account status")
-
     return parser
 
 
@@ -626,11 +553,8 @@ def main(argv: Optional[list] = None) -> None:
             dispatch = {
                 "init": do_init,
                 "config": do_config,
-                "alert": do_alert,
-                "heartbeat": do_heartbeat,
                 "admin": do_admin,
                 "serve": do_serve,
-                "status": do_status,
             }
             dispatch[args.subcommand](rpc, args)
     except AgentError as exc:
