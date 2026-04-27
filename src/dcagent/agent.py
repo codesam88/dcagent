@@ -24,6 +24,9 @@ from dcagent.bot import APP_NAME, get_addrs
 
 log = logging.getLogger(__name__)
 
+# Module-level flag for test mode (set by run_bot)
+_testmode = False
+
 
 # ---------------------------------------------------------------------------
 # Socket listener
@@ -131,6 +134,22 @@ def _socket_do_version(args: str, accid: int, rpc: Rpc) -> str:
         return f"error: version error: {exc}"
 
 
+def _socket_do_dcmsg(args: str, accid: int, rpc: Rpc) -> str:
+    """Send a message to all admin chats (test mode only)."""
+    if not args:
+        return "error: dcmsg requires a message"
+    try:
+        admin_chats = _bot._get_admin_chats(rpc, accid)
+        if not admin_chats:
+            return "error: no admin chats configured"
+        for chat_id in admin_chats:
+            rpc.send_msg(accid, chat_id, MsgData(text=args))
+        return f"ok: sent to {len(admin_chats)} admin chat(s)"
+    except Exception as exc:
+        log.exception("Dcmsg error: %s", exc)
+        return f"error: dcmsg error: {exc}"
+
+
 def _socket_dispatch(line: str, accid: int, rpc: Rpc, status_map: dict, alert_map: dict) -> str:
     """Parse and dispatch a single socket line by its first word (command)."""
     cmd, _, args = line.partition(" ")
@@ -143,6 +162,8 @@ def _socket_dispatch(line: str, accid: int, rpc: Rpc, status_map: dict, alert_ma
         return _socket_do_config(args, accid, rpc)
     elif cmd == "version":
         return _socket_do_version(args, accid, rpc)
+    elif cmd == "dcmsg" and _testmode:
+        return _socket_do_dcmsg(args, accid, rpc)
     else:
         return f"error: unknown command {cmd!r}"
 
@@ -412,8 +433,12 @@ def run_bot(
     alert_interval: int = 60,
     status_dir: str = "",
     status_interval: int = 60,
+    testmode: bool = False,
 ) -> None:
     """Full implementation: message handlers + optional socket listeners + heartbeat."""
+    global _testmode
+    _testmode = testmode
+
     addrs = get_addrs(rpc, accid)
     our_addr = addrs[0] if addrs else ""
     log.info("Listening at: %s", ", ".join(addrs))

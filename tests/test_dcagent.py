@@ -454,3 +454,95 @@ def test_on_ping_responds_with_pong():
     assert call_args[1] == 42  # chat_id
     msg_data = call_args[2]
     assert "Pong" in msg_data.text or "🏓" in msg_data.text
+
+
+# Testmode socket commands
+def test_socket_dispatch_dcmsg_requires_testmode():
+    """dcmsg command should be rejected when testmode is False."""
+    import dcagent.agent as agent
+
+    rpc = MagicMock()
+    original_testmode = agent._testmode
+    try:
+        agent._testmode = False
+        result = _socket_dispatch("dcmsg hello", accid=1, rpc=rpc, status_map={}, alert_map={})
+        assert "error" in result
+        assert "unknown command" in result
+    finally:
+        agent._testmode = original_testmode
+
+
+def test_socket_dispatch_dcmsg_with_testmode():
+    """dcmsg command should send to admin chats when testmode is True."""
+    import dcagent.agent as agent
+    from dcagent import bot
+
+    rpc = MagicMock()
+    rpc.get_config.return_value = "10,20"  # Two admin chats
+
+    # Mock the _get_admin_chats function
+    original_get_admin_chats = bot._get_admin_chats
+    original_testmode = agent._testmode
+    bot._get_admin_chats = MagicMock(return_value=[10, 20])
+
+    try:
+        agent._testmode = True
+        result = _socket_dispatch("dcmsg test message", accid=1, rpc=rpc, status_map={}, alert_map={})
+        assert "ok:" in result
+        assert "sent to 2 admin chat(s)" in result
+        # Verify send_msg was called for each admin chat
+        assert rpc.send_msg.call_count == 2
+    finally:
+        bot._get_admin_chats = original_get_admin_chats
+        agent._testmode = original_testmode
+
+
+def test_socket_dispatch_dcmsg_requires_message():
+    """dcmsg command should require a message argument."""
+    import dcagent.agent as agent
+
+    rpc = MagicMock()
+    original_testmode = agent._testmode
+    try:
+        agent._testmode = True
+        result = _socket_dispatch("dcmsg", accid=1, rpc=rpc, status_map={}, alert_map={})
+        assert "error" in result
+        assert "requires a message" in result
+    finally:
+        agent._testmode = original_testmode
+
+
+def test_socket_dispatch_dcmsg_no_admin_chats():
+    """dcmsg command should fail if no admin chats are configured."""
+    import dcagent.agent as agent
+    from dcagent import bot
+
+    rpc = MagicMock()
+
+    # Mock the _get_admin_chats function to return empty list
+    original_get_admin_chats = bot._get_admin_chats
+    original_testmode = agent._testmode
+    bot._get_admin_chats = MagicMock(return_value=[])
+
+    try:
+        agent._testmode = True
+        result = _socket_dispatch("dcmsg test", accid=1, rpc=rpc, status_map={}, alert_map={})
+        assert "error" in result
+        assert "no admin chats" in result
+    finally:
+        bot._get_admin_chats = original_get_admin_chats
+        agent._testmode = original_testmode
+
+
+def test_parser_testmode_flag():
+    """Parser should accept --testmode flag on serve command."""
+    parser = _build_parser()
+    args = parser.parse_args(["serve", "--testmode"])
+    assert args.testmode is True
+
+
+def test_parser_testmode_default():
+    """Parser --testmode should default to False."""
+    parser = _build_parser()
+    args = parser.parse_args(["serve"])
+    assert args.testmode is False

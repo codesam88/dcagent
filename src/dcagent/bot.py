@@ -432,6 +432,7 @@ def do_serve(rpc: Rpc, args: Namespace) -> None:
         args.alert_interval,
         args.status_dir,
         args.status_interval,
+        args.testmode,
     )
 
 
@@ -452,6 +453,7 @@ def run_bot(
     alert_interval: int = 60,
     status_dir: str = "",
     status_interval: int = 60,
+    testmode: bool = False,
 ) -> None:
     """Minimal bot: bare event loop with no message handlers."""
     addrs = get_addrs(rpc, accid)
@@ -567,6 +569,11 @@ def _build_parser() -> ArgumentParser:
         type=int,
         default=int(os.environ.get("DCAGENT_STATUS_INTERVAL", "60")),
         help="how often to run status scripts in seconds (default: %(default)s, env: DCAGENT_STATUS_INTERVAL)",
+    )
+    p.add_argument(
+        "--testmode",
+        action="store_true",
+        help="enable test mode with dcmsg socket command",
     )
 
     sub.add_parser("status", help="print bot/account status")
