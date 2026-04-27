@@ -188,8 +188,8 @@ if sudo -u "$DCAGENT_USER" test -d "$DCAGENT_ACCOUNTS" && \
 else
     run sudo -u "$DCAGENT_USER" "$INSTALL_BIN" init DCACCOUNT:https://nine.testrun.org/new
     run sudo -u "$DCAGENT_USER" "$INSTALL_BIN" config displayname "$DEFAULT_NAME"
+	run sudo -u "$DCAGENT_USER" "$INSTALL_BIN" admin
 fi
-run sudo -u "$DCAGENT_USER" "$INSTALL_BIN" admin
 
 if $LAUNCH; then
     run systemctl enable --now dcagent

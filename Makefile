@@ -53,7 +53,7 @@ dist:
 	uv run shiv -c dcagent -o $(DIST_PYZ) .
 	@echo
 	@echo "Test generated binary:"
-	$(DIST_PYZ) status
+	$(DIST_PYZ) -v
 	@echo
 	@echo "Built done: $(DIST_PYZ)"
 
