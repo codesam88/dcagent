@@ -8,15 +8,9 @@ If a node goes silent, a surviving node sends an alert to the alert channel.
 
 ## Setup
 
-Each participating node joins the same heartbeat group:
-
-```bash
-# On the first node — create the group and print the invite
-dcagent heartbeat
-
-# On every other node — join using the invite
-dcagent heartbeat INVITE
-```
+Each participating node joins the same heartbeat group via the `/heartbeat` chat command
+(admin only). On the first node, send `/heartbeat` to create the group and get an invite.
+On every other node, send `/heartbeat INVITE` to join using the invite link.
 
 ## Message format
 

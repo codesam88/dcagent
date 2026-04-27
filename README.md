@@ -51,47 +51,22 @@ Optionally set an avatar:
 uv run dcagent config selfavatar ./avatar.png
 ```
 
-### 4. Set up alert recipients
+### 4. Setup Admin Channel (optional)
 
-The `alert` command manages the bot's alert group — a group chat named after
-the bot (e.g. `My Agent alerts`) that receives all pipe notifications. Without
-an invite, it prints an invite link to that group:
+The `/admin` chat command manages admin group chats. Admins can use this command
+to generate invite links to the bot's admin group chat. The group is named after
+the bot (e.g. `My Agent admins`). Send `/admin` in a chat to get an invite link.
 
-```bash
-uv run dcagent alert
-```
-
-Share the printed link with anyone who should receive alerts. When they scan it,
-they join the bot's alert group chat. Alternatively, have the bot join a chat
-defined by the user by passing their invite link:
-
-```bash
-uv run dcagent alert <invite-link>
-```
-
-All alert chats (whether created here or joined via invite) will receive every
-message sent through the pipe.
-
-### 5. Setup Admin Channel (optional)
-
-The `admin` command manages admin group chats. The group is named after the bot
-(e.g. `My Agent admins`). Without an invite, it prints an invite link to the
-bot's admin group:
+Alternatively, set up the admin channel via CLI:
 
 ```bash
 uv run dcagent admin
 ```
 
-Alternatively, have the bot join an admin channel defined by the user:
-
-```bash
-uv run dcagent admin <invite-link>
-```
-
 All accounts present in any admin chat are considered admins. Multiple admin
 chats are supported.
 
-### 6. Start the agent
+### 5. Start the agent
 
 ```bash
 uv run dcagent serve
@@ -99,30 +74,25 @@ uv run dcagent serve
 
 Send a message to the agent in your Delta Chat app — it will echo it right back!
 
-Use `status` at any time to see the current account and invite links:
+Once the bot is running, admins can use chat commands:
+- `/help` — shows available commands
+- `/version` — shows dcagent version
+- `/chats` — lists managed alert and admin chats
+- `/alert` — join or create an alert chat
+- `/leave <chatid>` — leave a managed chat
 
-```bash
-uv run dcagent status
-```
+### 6. Set up alert recipients (optional)
+
+Alert chats receive all notifications from monitoring scripts. Admins can use the
+`/alert` chat command to create or join alert chats. The bot's alert group is
+typically named after the bot (e.g. `My Agent alerts`).
 
 ### 7. Set up heartbeat monitoring (optional)
 
-The `heartbeat` command manages heartbeat group chats (named e.g. `My Agent heartbeat`).
-Multiple agents can join the same heartbeat group to monitor each other's liveness.
-Without an invite, it prints an invite link to the bot's heartbeat group:
-
-```bash
-uv run dcagent heartbeat
-```
-
-Have another agent join the heartbeat group:
-
-```bash
-uv run dcagent heartbeat <invite-link>
-```
-
-Once serving, agents periodically broadcast heartbeats. If a node stops
-responding, the elected master node sends an offline alert to all alert chats.
+Multiple agents can monitor each other's liveness by joining a shared heartbeat
+group. Use the `/heartbeat` chat command (admin only) to create or join a
+heartbeat chat. Once connected, agents periodically broadcast heartbeats. If a
+node stops responding, the master node sends an offline alert to all alert chats.
 Recovery is also detected and alerted. See [docs/heartbeat.md](docs/heartbeat.md)
 for the full protocol spec.
 
@@ -203,8 +173,8 @@ sudo examples/systemd/setup.sh
 
 The script downloads the latest release binary for your architecture from the
 [releases page](../../releases), creates a dedicated system user, installs the
-systemd unit and environment file, creates a chatmail account, and prints
-invite links for the alert, heartbeat, and admin groups.
+systemd unit and environment file, creates a chatmail account, and prints the
+admin group invite link.
 
 To use a locally built binary instead:
 

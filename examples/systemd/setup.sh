@@ -100,7 +100,7 @@ echo "  $N. install config file to $CONF_DEST (unless exists)"; (( N++ ))
 echo "  $N. create per-script config dir $DCAGENT_CONF_DIR/conf.d"; (( N++ ))
 echo "  $N. create system user '$DCAGENT_USER' (unless exists)"; (( N++ ))
 echo "  $N. create chatmail account on nine.testrun.org as '$DEFAULT_NAME' (unless already configured)"; (( N++ ))
-echo "  $N. print alert, heartbeat, and admin invite links"; (( N++ ))
+echo "  $N. print admin invite link"; (( N++ ))
 $LAUNCH && { echo "  $N. enable and start dcagent.service"; (( N++ )); } || true
 echo
 
@@ -189,8 +189,6 @@ else
     run sudo -u "$DCAGENT_USER" "$INSTALL_BIN" init DCACCOUNT:https://nine.testrun.org/new
     run sudo -u "$DCAGENT_USER" "$INSTALL_BIN" config displayname "$DEFAULT_NAME"
 fi
-run sudo -u "$DCAGENT_USER" "$INSTALL_BIN" alert
-run sudo -u "$DCAGENT_USER" "$INSTALL_BIN" heartbeat
 run sudo -u "$DCAGENT_USER" "$INSTALL_BIN" admin
 
 if $LAUNCH; then
