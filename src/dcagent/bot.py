@@ -12,6 +12,8 @@ Subcommands:
     init ADDR [PASSWORD]   – configure a new account
     config [KEY [VALUE]]   – get/set account configuration
     admin [INVITE]         – print admin-group invite link, or join one via SecureJoin
+    alert [INVITE]         – print alert-chat invite link, or join one via SecureJoin
+    heartbeat [INVITE]     – print heartbeat-chat invite link, or join one via SecureJoin
     serve [--pipe-path PATH] [--testmode]    – run the bot (event loop + optional pipe listener)
 
 Pipe input format:
@@ -350,6 +352,48 @@ def do_admin(rpc: Rpc, args: Namespace) -> None:
     log.info("Joined admin channel (chat_id=%s)", chat_id)
 
 
+def do_alert(rpc: Rpc, args: Namespace) -> None:
+    """Print the alert-chat invite link, or join an existing one via SecureJoin.
+
+    Without an invite argument: prints the invite link for this bot's alert chat.
+
+    With an invite argument: joins the alert chat identified by the SecureJoin
+    invite link and stores it as this bot's alert chat.
+    """
+    accid = _get_account(rpc)
+    _ensure_configured(rpc, accid)
+
+    if not args.invite:
+        chatid = _get_or_create_alert_chat(rpc, accid)
+        print(rpc.get_chat_securejoin_qr_code(accid, chatid))
+        return
+
+    chat_id = _securejoin(rpc, accid, args.invite)
+    _add_alert_chat(rpc, accid, chat_id)
+    log.info("Joined alert chat (chat_id=%s)", chat_id)
+
+
+def do_heartbeat(rpc: Rpc, args: Namespace) -> None:
+    """Print the heartbeat-chat invite link, or join an existing one via SecureJoin.
+
+    Without an invite argument: prints the invite link for this bot's heartbeat chat.
+
+    With an invite argument: joins the heartbeat chat identified by the SecureJoin
+    invite link and stores it as this bot's heartbeat chat.
+    """
+    accid = _get_account(rpc)
+    _ensure_configured(rpc, accid)
+
+    if not args.invite:
+        chatid = _get_or_create_heartbeat_chat(rpc, accid)
+        print(rpc.get_chat_securejoin_qr_code(accid, chatid))
+        return
+
+    chat_id = _securejoin(rpc, accid, args.invite)
+    _add_heartbeat_chat(rpc, accid, chat_id)
+    log.info("Joined heartbeat chat (chat_id=%s)", chat_id)
+
+
 def do_serve(rpc: Rpc, args: Namespace) -> None:
     """Start the bot event loop."""
     accid = _get_account(rpc)
@@ -441,6 +485,12 @@ def _build_parser() -> ArgumentParser:
     p = sub.add_parser("admin", help="print admin-group invite link, or join one via SecureJoin")
     p.add_argument("invite", nargs="?", metavar="INVITE", help="if given, join this admin channel via SecureJoin")
 
+    p = sub.add_parser("alert", help="print alert-chat invite link, or join one via SecureJoin")
+    p.add_argument("invite", nargs="?", metavar="INVITE", help="if given, join this alert chat via SecureJoin")
+
+    p = sub.add_parser("heartbeat", help="print heartbeat-chat invite link, or join one via SecureJoin")
+    p.add_argument("invite", nargs="?", metavar="INVITE", help="if given, join this heartbeat chat via SecureJoin")
+
     p = sub.add_parser("serve", help="run the bot")
     p.add_argument(
         "--pipe-path",
@@ -510,6 +560,8 @@ def main(argv: Optional[list] = None) -> None:
                 "init": do_init,
                 "config": do_config,
                 "admin": do_admin,
+                "alert": do_alert,
+                "heartbeat": do_heartbeat,
                 "serve": do_serve,
             }
             dispatch[args.subcommand](rpc, args)
