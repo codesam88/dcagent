@@ -76,11 +76,11 @@ class HeartbeatState:
             time.sleep(self.interval)
 
             seq = self._next_seq()
-            text = f"heartbeat {our_addr} {seq}"
+            text = f"tick {our_addr} {seq}"
             for chat_id in _bot._get_heartbeat_chats(rpc, accid):
                 try:
                     rpc.send_msg(accid, chat_id, MsgData(text=text))
-                    log.debug("Sent heartbeat seq=%d to chat %d", seq, chat_id)
+                    log.debug("Sent tick seq=%d to chat %d", seq, chat_id)
                 except Exception as exc:
                     log.warning("Failed to send heartbeat to chat %d: %s", chat_id, exc)
 
@@ -118,11 +118,11 @@ class HeartbeatState:
             if msg.chat_id not in _bot._get_heartbeat_chats(bot.rpc, accid):
                 return
             parts = (msg.text or "").split()
-            if len(parts) < 3 or parts[0] != "heartbeat":
+            if len(parts) < 3 or parts[0] != "tick":
                 return
             addr = parts[1]
             self._mark_seen(addr)
-            log.debug("Heartbeat received from %s seq=%s", addr, parts[2])
+            log.debug("Tick received from %s seq=%s", addr, parts[2])
 
         return _on_heartbeat
 
