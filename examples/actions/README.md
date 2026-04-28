@@ -10,8 +10,8 @@ caller (scheduler) redirects these outputs to a socket exposed by dcagent.
 - Scheduling: Each action can output one or more alert messages (`alert
   <category> <message>`) and/or set a field in the bot's status line (`status
   <key> <value>`). An external scheduler such as Cron can be used to launch the
-  scripts and forward the output to the dcagent socket listener. For detailed
-  syntax see the bot's socket command documentation.
+  scripts and forward the output to the dcagent pipe listener. For detailed
+  syntax see the [pipe command reference](../../README.md#pipe-commands).
 
 - Configuration: scripts should use `DCAGENT_CONFIG_PATH` (default:
   `/etc/dcagent`) and source its dcagent.conf for global settings, then source an

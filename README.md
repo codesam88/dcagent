@@ -11,6 +11,41 @@ where accounts are free and nobody judges you for talking to bots.
 - **Alerts** — send notifications to an admin or group chat
 - **Pipe relay** — local programs send messages via a Unix named pipe
 
+## Command Reference
+
+### CLI & Chat Commands
+
+| Feature | CLI (bot.py) | Chat (agent.py) | Notes |
+|---|---|---|---|
+| Help | `-h` / `--help` | `/help` | |
+| Version | `-v` / `--version` | `/version` | |
+| Init account | `init ADDR [PASS]` | — | Register DC account |
+| Config | `config [KEY [VAL]]` | — | Get/set DC account config |
+| Admin chat | `admin [INVITE]` | `/admin [INVITE]` ★ | Print or join given invite for admin control |
+| Alert chat | `alert [INVITE]` | `/alert [INVITE]` ★ | Print or join given invite for alert/notifications |
+| Heartbeat chat | `heartbeat [INVITE]` | `/heartbeat [INVITE]` ★ | Print or join given invite for heartbeat protocol |
+| Serve | `serve [opts]` | — | Start the agent (including pipe listener and heartbeat threads) |
+
+### Additional Chat Commands
+
+| Command | Syntax | Description |
+| Echo test  | — | `/ping MSG` | Echo MSG back on same chat |
+| List chats | — | `/chats` ★ | List managed chat IDs |
+| Leave chat | — | `/leave CHATID` ★ | Leave and unregister a chat |
+
+★ admin only
+
+### Pipe Commands
+
+The pipe is a write-only interface for external processes (e.g. monitoring scripts) running on the same host.
+Commands are newline-delimited; each line starts with a command word followed by space-separated arguments.
+
+| Command | Syntax | Description |
+|---|---|---|
+| `alert` | `alert <category> [message]` | Send message to all alert chats. See handling of alert messages for details. |
+| `status` | `status <key> <value>` | Set bot status. See handling of bot status field for details. |
+| `dcmsg` | `dcmsg <message>` | Send a raw message to all admin chats (only available in `--testmode`). |
+
 ## Requirements
 
 - Python 3.12+
@@ -74,12 +109,7 @@ uv run dcagent serve
 
 Send a message to the agent in your Delta Chat app — it will echo it right back!
 
-Once the bot is running, admins can use chat commands:
-- `/help` — shows available commands
-- `/version` — shows dcagent version
-- `/chats` — lists managed alert and admin chats
-- `/alert` — join or create an alert chat
-- `/leave <chatid>` — leave a managed chat
+Once the bot is running, chat commands are available. See [Command Reference](#command-reference) for the full list.
 
 ### 6. Set up alert recipients (optional)
 
@@ -115,9 +145,6 @@ echo "alert disk-usage-root disk 95% full" > /tmp/dcagent.pipe
 # Clear an alert (sends recovery message on first clear)
 echo "alert disk-usage-root" > /tmp/dcagent.pipe
 
-# Immediate alert without deduplication (category "")
-echo "alert '' CRITICAL: System overheating!" > /tmp/dcagent.pipe
-
 # Update status
 echo "status disk 95%" > /tmp/dcagent.pipe
 
@@ -151,7 +178,7 @@ individual sensor names as part of the category, thus supporting
 multiple/parallel alarm types.
 
 ```bash
-examples/actions/disk-space-alert | nc -U /run/dcagent/dcagent.sock
+examples/actions/disk-space-alert > /run/dcagent/dcagent.pipe
 ```
 
 ## Deployment
@@ -251,7 +278,6 @@ echo "status 01_reboot [needs-reboot]" > /run/dcagent/dcagent.pipe
 Check status and logs:
 
 ```bash
-dcagent status
 systemctl status dcagent
 journalctl -u dcagent -f
 ```
