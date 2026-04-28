@@ -189,13 +189,14 @@ def _on_help(bot: Bot, accid: int, event) -> None:
     help_text = (
         f"👋 Hi! I am {bot_name}.\n\n"
         "Commands:\n"
-        "  /help    – show this\n"
-        "  /ping    – check I'm alive\n"
-        "  /version – show dcagent version\n"
-        "  /alert   – manage alert chat (admin only)\n"
-        "  /admin   – manage admin chat (admin only)\n"
-        "  /chats   – list managed chats (admin only)\n"
-        "  /leave   – leave a chat (admin only)"
+        "  /help       – show this\n"
+        "  /ping       – check I'm alive\n"
+        "  /version    – show dcagent version\n"
+        "  /alert      – manage alert chat (admin only)\n"
+        "  /admin      – manage admin chat (admin only)\n"
+        "  /heartbeat  – manage heartbeat chat (admin only)\n"
+        "  /chats      – list managed chats (admin only)\n"
+        "  /leave      – leave a chat (admin only)"
     )
     bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=help_text))
 
@@ -275,6 +276,7 @@ def _on_chats(bot: Bot, accid: int, event) -> None:
 
     admin_chats = _bot._get_admin_chats(bot.rpc, accid)
     alert_chats = _bot._get_alert_chats(bot.rpc, accid)
+    heartbeat_chats = _bot._get_heartbeat_chats(bot.rpc, accid)
 
     lines = ["Managed chats:"]
     if admin_chats:
@@ -285,10 +287,40 @@ def _on_chats(bot: Bot, accid: int, event) -> None:
         lines.append("Alert:")
         for cid in alert_chats:
             lines.append(f"  {cid}")
-    if not admin_chats and not alert_chats:
+    if heartbeat_chats:
+        lines.append("Heartbeat:")
+        for cid in heartbeat_chats:
+            lines.append(f"  {cid}")
+    if not admin_chats and not alert_chats and not heartbeat_chats:
         lines.append("(none)")
 
     bot.rpc.send_msg(accid, msg.chat_id, MsgData(text="\n".join(lines)))
+
+
+def _on_heartbeat(bot: Bot, accid: int, event) -> None:
+    msg = event.msg
+    if msg.chat_id not in _bot._get_admin_chats(bot.rpc, accid):
+        bot.rpc.send_msg(accid, msg.chat_id, MsgData(text="❌ Only admins can use /heartbeat"))
+        return
+
+    # Format: "/heartbeat [<invite>]"
+    parts = msg.text.strip().split(None, 1)
+    invite = parts[1] if len(parts) > 1 else None
+
+    try:
+        if not invite:
+            # Generate and send heartbeat chat invite
+            chatid = _bot._get_or_create_heartbeat_chat(bot.rpc, accid)
+            qr_code = bot.rpc.get_chat_securejoin_qr_code(accid, chatid)
+            bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=f"Heartbeat chat invite:\n{qr_code}"))
+        else:
+            # Join heartbeat chat from invite
+            chat_id = _bot._securejoin(bot.rpc, accid, invite)
+            _bot._add_heartbeat_chat(bot.rpc, accid, chat_id)
+            bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=f"✓ Joined heartbeat chat (chat_id={chat_id})"))
+    except Exception as e:
+        log.exception("Error handling /heartbeat command")
+        bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=f"❌ Error: {e}"))
 
 
 def _on_leave(bot: Bot, accid: int, event) -> None:
@@ -364,6 +396,7 @@ def run_bot(
         (_on_version, events.NewMessage(command="/version")),
         (_on_alert, events.NewMessage(command="/alert")),
         (_on_admin, events.NewMessage(command="/admin")),
+        (_on_heartbeat, events.NewMessage(command="/heartbeat")),
         (_on_chats, events.NewMessage(command="/chats")),
         (_on_leave, events.NewMessage(command="/leave")),
         (hb_state.make_handler(), events.NewMessage(is_bot=None)),
@@ -381,8 +414,7 @@ def run_bot(
             daemon=True,
         ).start()
 
-    if _bot._get_heartbeat_chats(rpc, accid):
-        hb_state.start(rpc, accid, our_addr)
+    hb_state.start(rpc, accid, our_addr)
 
     # Send startup message to alert chats
     chat_ids = _bot._get_alert_chats(rpc, accid)

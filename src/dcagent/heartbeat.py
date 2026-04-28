@@ -30,6 +30,7 @@ class HeartbeatState:
         self.last_seen: dict[str, float] = {}  # addr -> monotonic timestamp
         self.offline: set[str] = set()
         self.lock = threading.Lock()
+        self._started: bool = False
 
     def _next_seq(self) -> int:
         with self.lock:
@@ -126,7 +127,11 @@ class HeartbeatState:
         return _on_heartbeat
 
     def start(self, rpc: Rpc, accid: int, our_addr: str) -> None:
-        """Start the heartbeat sender thread."""
+        """Start the heartbeat sender thread. Idempotent — safe to call multiple times."""
+        with self.lock:
+            if self._started:
+                return
+            self._started = True
         t = threading.Thread(
             target=self.sender_thread,
             args=(rpc, accid, our_addr),
