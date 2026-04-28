@@ -14,6 +14,7 @@ ExecStart=/usr/local/bin/dcagent serve
 ExecStartPost=/usr/local/bin/dcagent-run-actions
 Restart=on-failure
 RestartSec=10
+KillMode=process
 
 [Install]
 WantedBy=multi-user.target

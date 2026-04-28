@@ -368,6 +368,20 @@ def _on_leave(bot: Bot, accid: int, event) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _report_config(
+    addrs: list,
+    pipe_path: str,
+    heartbeat_interval: int,
+    testmode: bool,
+) -> None:
+    """Log active configuration at INFO level on startup."""
+    log.info("Listening at: %s", ", ".join(addrs))
+    log.info("Heartbeat interval: %ds", heartbeat_interval)
+    log.info("Pipe listener: %s", pipe_path if pipe_path else "disabled")
+    if testmode:
+        log.warning("Test mode enabled (dcmsg pipe command active)")
+
+
 def run_bot(
     rpc: Rpc,
     accid: int,
@@ -385,7 +399,7 @@ def run_bot(
 
     addrs = get_addrs(rpc, accid)
     our_addr = addrs[0] if addrs else ""
-    log.info("Listening at: %s", ", ".join(addrs))
+    _report_config(addrs, pipe_path, heartbeat_interval, testmode)
 
     hb_state = _heartbeat.HeartbeatState(interval=heartbeat_interval)
 

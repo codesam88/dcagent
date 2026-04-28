@@ -56,15 +56,30 @@ def _atexit_cleanup() -> None:
         _LOCKED_ACCOUNT_DB = None
 
 
-def _signal_handler(signum: int, frame) -> None:
-    """Handle termination signals by exiting cleanly (atexit will clean up)."""
-    sys.exit(0)
+def _sigterm_handler(signum: int, frame) -> None:
+    """Handle SIGTERM by releasing the lock and exiting immediately.
+
+    sys.exit() is avoided because it can deadlock: deltachat-rpc-server may
+    already be dead (OOM, crash, or systemd stopping the cgroup without
+    KillMode=process), causing IOTransport.close() to hang forever waiting
+    for a JSON-RPC response that will never arrive.  os._exit() bypasses that
+    path; the subprocess stdin pipe closes on exit, so deltachat-rpc-server
+    exits via EOF even if still alive.
+
+    SIGINT is left at its Python default (raise KeyboardInterrupt), which the
+    run_bot loop catches and returns from cleanly, allowing IOTransport.close()
+    to run and atexit to release the lock.
+    """
+    log.info("Received SIGTERM — releasing lock and exiting")
+    _atexit_cleanup()
+    os._exit(0)
 
 
-# Register handlers
+# Release account lock on exit paths
+# - SIGINT (KeyboardInterrupt) and normal exit invoke atexit
+# - SIGTERM needs an explicit handler to invoke same atexit cleanup
 atexit.register(_atexit_cleanup)
-signal.signal(signal.SIGTERM, _signal_handler)
-signal.signal(signal.SIGINT, _signal_handler)
+signal.signal(signal.SIGTERM, _sigterm_handler)
 
 
 def _get_version() -> str:
@@ -99,16 +114,27 @@ def _get_dcagent_lock_file(account_db: str) -> str:
 def _check_dcagent_lock(account_db: str) -> Optional[str]:
     """Check if another dcagent process holds a lock.
 
-    Retries a few times to allow cleanup from recently terminated processes.
-    Returns lock file path if it exists after retries, None otherwise.
+    Reads the PID from the lock file and checks whether that process is still
+    alive.  A lock whose PID is gone is treated as stale and removed.
+    Returns the lock file path if a live process holds it, None otherwise.
     """
-    for attempt in range(5):
-        lock_file = _get_dcagent_lock_file(account_db)
-        if not os.path.exists(lock_file):
-            return None
-        if attempt < 4:  # Don't sleep on last attempt
-            time.sleep(0.5)
-    return lock_file
+    lock_file = _get_dcagent_lock_file(account_db)
+    if not os.path.exists(lock_file):
+        return None
+    try:
+        with open(lock_file) as f:
+            pid = int(f.read().strip())
+        os.kill(pid, 0)  # signal 0: existence check only
+        return lock_file  # process is alive, lock is valid
+    except ProcessLookupError:
+        log.warning("Removing stale lock file (PID %s no longer exists)", pid)
+        _remove_dcagent_lock(account_db)
+        return None
+    except (ValueError, OSError):
+        # Unreadable / corrupt lock file — remove it
+        log.warning("Removing unreadable lock file %s", lock_file)
+        _remove_dcagent_lock(account_db)
+        return None
 
 
 def _write_dcagent_lock(account_db: str) -> None:
