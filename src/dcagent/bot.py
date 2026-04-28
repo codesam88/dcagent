@@ -1,9 +1,9 @@
 """
 dcagent bot — lifecycle commands, RPC infrastructure, and CLI entry point.
 
-Provides the do_* lifecycle commands (init, config, alert, admin, serve),
+Provides the do_* lifecycle commands (init, config, admin, serve),
 shared helpers, and main(). run_bot() has a minimal default implementation
-that agent.py overrides with the full handler/socket stack.
+that agent.py overrides with the full handler/pipe stack.
 
 Usage:
     dcagent [--account-db PATH] [--log-level LEVEL] [--log-file PATH] <subcommand> [args]
@@ -11,17 +11,16 @@ Usage:
 Subcommands:
     init ADDR [PASSWORD]   – configure a new account
     config [KEY [VALUE]]   – get/set account configuration
-    alert [INVITE]        – print alert-group invite link, or join one via SecureJoin
-    heartbeat [INVITE]     – print heartbeat-group invite link, or join one via SecureJoin
     admin [INVITE]         – print admin-group invite link, or join one via SecureJoin
-    status                 – print account status and alert/admin invite links
-    serve [--listen-socket PATH] [--listen-addr ADDR]    – run the bot (event loop + optional socket listeners)
+    serve [--pipe-path PATH] [--testmode]    – run the bot (event loop + optional pipe listener)
 
-Socket input format:
+Pipe input format:
     <command> [args...]
 
     alert <category> [message]   update alert state; only sends if state changed or category=""
     status <key> <msg>           update status element key to msg
+    dcmsg <message>              send message to admin chats (testmode only)
+    version                      send version to admin chats
 """
 
 import atexit
@@ -360,8 +359,7 @@ def do_serve(rpc: Rpc, args: Namespace) -> None:
     run_bot(
         rpc,
         accid,
-        args.listen_socket,
-        args.listen_addr,
+        args.pipe_path,
         args.heartbeat,
         args.alert_dir,
         args.alert_interval,
@@ -381,9 +379,8 @@ def do_serve(rpc: Rpc, args: Namespace) -> None:
 def run_bot(
     rpc: Rpc,
     accid: int,
-    listen_socket: str,
-    listen_addr: str,
-    heartbeat_interval: int,
+    pipe_path: str = "",
+    heartbeat_interval: int = 60,
     alert_dir: str = "",
     alert_interval: int = 60,
     status_dir: str = "",
@@ -455,16 +452,10 @@ def _build_parser() -> ArgumentParser:
 
     p = sub.add_parser("serve", help="run the bot")
     p.add_argument(
-        "--listen-socket",
+        "--pipe-path",
         metavar="PATH",
-        default=os.environ.get("DCAGENT_LISTEN_SOCKET"),
-        help="Unix domain socket path (env: DCAGENT_LISTEN_SOCKET)",
-    )
-    p.add_argument(
-        "--listen-addr",
-        metavar="ADDR",
-        default=os.environ.get("DCAGENT_LISTEN_ADDR"),
-        help="inet socket address host:port (env: DCAGENT_LISTEN_ADDR)",
+        default=os.environ.get("DCAGENT_PIPE_PATH"),
+        help="Unix named pipe path for external commands (env: DCAGENT_PIPE_PATH)",
     )
     p.add_argument(
         "--heartbeat",
@@ -474,35 +465,9 @@ def _build_parser() -> ArgumentParser:
         help="heartbeat interval in seconds (default: %(default)s, env: DCAGENT_HEARTBEAT)",
     )
     p.add_argument(
-        "--alert-dir",
-        metavar="PATH",
-        default=os.environ.get("DCAGENT_ALERT_DIR"),
-        help="run run-parts on this directory for alert scripts (env: DCAGENT_ALERT_DIR)",
-    )
-    p.add_argument(
-        "--alert-interval",
-        metavar="SECONDS",
-        type=int,
-        default=int(os.environ.get("DCAGENT_ALERT_INTERVAL", "60")),
-        help="how often to run alert scripts in seconds (default: %(default)s, env: DCAGENT_ALERT_INTERVAL)",
-    )
-    p.add_argument(
-        "--status-dir",
-        metavar="PATH",
-        default=os.environ.get("DCAGENT_STATUS_DIR"),
-        help="run run-parts on this directory for status scripts (env: DCAGENT_STATUS_DIR)",
-    )
-    p.add_argument(
-        "--status-interval",
-        metavar="SECONDS",
-        type=int,
-        default=int(os.environ.get("DCAGENT_STATUS_INTERVAL", "60")),
-        help="how often to run status scripts in seconds (default: %(default)s, env: DCAGENT_STATUS_INTERVAL)",
-    )
-    p.add_argument(
         "--testmode",
         action="store_true",
-        help="enable test mode with dcmsg socket command",
+        help="enable test mode with dcmsg pipe command",
     )
 
     return parser

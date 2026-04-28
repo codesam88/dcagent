@@ -98,43 +98,32 @@ for the full protocol spec.
 
 ### 8. Send external commands
 
-The agent can accept commands from a Unix domain socket or TCP socket.
+The agent can accept commands from a Unix named pipe.
 
-Start with `--listen-socket` for a Unix socket (recommended for local use):
+Start the agent with `--pipe-path`:
 
 ```bash
-uv run dcagent serve --listen-socket /tmp/dcagent.sock
+uv run dcagent serve --pipe-path /tmp/dcagent.pipe
 ```
 
-Or `--listen-addr` for TCP (useful for network access):
+Then send commands to the pipe:
 
 ```bash
-uv run dcagent serve --listen-addr 127.0.0.1:9999
-```
-
-Or both simultaneously:
-
-```bash
-uv run dcagent serve --listen-socket /tmp/dcagent.sock --listen-addr 127.0.0.1:9999
-```
-
-Then send commands via `nc` (netcat):
-
-```bash
-# Via Unix socket
-echo "alert disk-usage-root disk 95% full" | nc -U /tmp/dcagent.sock
-
-# Via TCP
-echo "alert disk-usage-root disk 95% full" | nc 127.0.0.1 9999
+# Send an alert
+echo "alert disk-usage-root disk 95% full" > /tmp/dcagent.pipe
 
 # Clear an alert (sends recovery message on first clear)
-echo "alert disk-usage-root" | nc -U /tmp/dcagent.sock
+echo "alert disk-usage-root" > /tmp/dcagent.pipe
 
 # Immediate alert without deduplication (category "")
-echo "alert '' CRITICAL: System overheating!" | nc -U /tmp/dcagent.sock
+echo "alert '' CRITICAL: System overheating!" > /tmp/dcagent.pipe
 
 # Update status
-echo "status disk 95%" | nc -U /tmp/dcagent.sock
+echo "status disk 95%" > /tmp/dcagent.pipe
+
+# Send a message to admin chats (testmode only)
+uv run dcagent serve --pipe-path /tmp/dcagent.pipe --testmode
+# Then: echo "dcmsg Test message to admin" > /tmp/dcagent.pipe
 ```
 
 **Handling of Status Inputs**
@@ -142,6 +131,11 @@ echo "status disk 95%" | nc -U /tmp/dcagent.sock
 - `status` inputs are aggregated in a key-value dictionary
 - The overall bot status is created by concatenating the list of status
   values, sorted based on their keys.
+
+**Testmode**
+
+The `--testmode` flag enables the `dcmsg` command for sending messages to admin chats.
+This is useful for integration tests or manual testing of chat command handlers.
 
 **Handling of Alert Inputs**
 
@@ -208,8 +202,7 @@ Key settings:
 | Variable | Default | Description |
 |---|---|---|
 | `DCAGENT_CONFIG_PATH` | `/etc/dcagent` | Root config directory containing `dcagent.conf`, `conf.d/`, `actions/`, and `cron/` |
-| `DCAGENT_LISTEN_SOCKET` | `/run/dcagent/dcagent.sock` | Unix domain socket path |
-| `DCAGENT_LISTEN_ADDR` | (disabled) | TCP socket address (host:port format) |
+| `DCAGENT_PIPE_PATH` | `/run/dcagent/dcagent.pipe` | Unix named pipe path for external commands |
 | `DCAGENT_HEARTBEAT` | `60` | Heartbeat broadcast interval (seconds) |
 | `DCAGENT_LOG_LEVEL` | `info` | Log level (`debug`, `info`, `warning`, `error`) |
 
@@ -237,26 +230,22 @@ echo "status my_key some value"
 ```
 
 Ready-made example scripts are in `examples/actions/`.
-They can also be run standalone by piping to the socket:
+They output alerts and status updates that can be fed to the pipe:
 
 ```bash
-examples/actions/disk-space-alert | nc -U /run/dcagent/dcagent.sock
+examples/actions/disk-space-alert > /run/dcagent/dcagent.pipe
 ```
 
 ### Usage
 
-The unit runs as the `dcagent` user, restarts on failure, and exposes sockets
+The unit runs as the `dcagent` user, restarts on failure, and listens on a Unix named pipe
 for external commands.
 
-Send alerts or status updates directly via socket:
+Send alerts or status updates via the pipe:
 
 ```bash
-# Unix socket
-echo "alert Disk /data is 95% full" | nc -U /run/dcagent/dcagent.sock
-echo "status 01_reboot [needs-reboot]" | nc -U /run/dcagent/dcagent.sock
-
-# Or via TCP if configured
-echo "alert Disk /data is 95% full" | nc 127.0.0.1 9999
+echo "alert Disk /data is 95% full" > /run/dcagent/dcagent.pipe
+echo "status 01_reboot [needs-reboot]" > /run/dcagent/dcagent.pipe
 ```
 
 Check status and logs:
@@ -271,7 +260,7 @@ journalctl -u dcagent -f
 
 ## Components
 
-- **`src/dcagent/`** — package source: `agent.py` (runtime, socket listeners, chat handlers), `bot.py` (CLI, account lifecycle), `heartbeat.py` (heartbeat protocol)
+- **`src/dcagent/`** — package source: `agent.py` (runtime, pipe listener, chat handlers), `bot.py` (CLI, account lifecycle), `heartbeat.py` (heartbeat protocol)
 - **`tests/`** — unit tests (pytest + mocks) and integration tests
 - **`docs/`** — protocol and feature documentation
 - **`examples/`** — monitoring scripts for alerts and status, plus systemd service setup
