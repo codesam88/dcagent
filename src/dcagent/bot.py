@@ -20,7 +20,6 @@ Pipe input format:
     alert <category> [message]   update alert state; only sends if state changed or category=""
     status <key> <msg>           update status element key to msg
     dcmsg <message>              send message to admin chats (testmode only)
-    version                      send version to admin chats
 """
 
 import atexit
@@ -361,10 +360,6 @@ def do_serve(rpc: Rpc, args: Namespace) -> None:
         accid,
         args.pipe_path,
         args.heartbeat,
-        args.alert_dir,
-        args.alert_interval,
-        args.status_dir,
-        args.status_interval,
         args.testmode,
     )
 
@@ -381,10 +376,6 @@ def run_bot(
     accid: int,
     pipe_path: str = "",
     heartbeat_interval: int = 60,
-    alert_dir: str = "",
-    alert_interval: int = 60,
-    status_dir: str = "",
-    status_interval: int = 60,
     testmode: bool = False,
 ) -> None:
     """Minimal bot: bare event loop with no message handlers."""

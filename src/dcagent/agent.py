@@ -143,14 +143,7 @@ def _pipe_dispatch(line: str, accid: int, rpc: Rpc, status_map: dict, alert_map:
 
 
 def _pipe_listener(path: str, accid: int, rpc: Rpc, status_map: dict, alert_map: dict) -> None:
-    """Blocking loop that reads command lines from the named pipe and dispatches them.
-
-    Commands:
-        alert <category> <message>    update alert state and send if changed
-        status <key> <msg>            update status element key to msg
-        dcmsg <message>               send message to admin chats (testmode only)
-        version                       send version to admin chats
-    """
+    """Blocking loop that reads command lines from the named pipe and dispatches them."""
     _ensure_pipe(path)
     log.info("Waiting for messages on %s", path)
 
