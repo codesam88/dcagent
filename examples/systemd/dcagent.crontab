@@ -11,16 +11,16 @@ DCAGENT_CRON_PATH=/etc/dcagent/cron
 DCAGENT_PIPE_PATH=/run/dcagent/dcagent.pipe
 
 # Hourly: run all scripts in hourly.d
-0 * * * * /usr/bin/run-parts $DCAGENT_CRON_PATH/hourly.d  2>/dev/null > $DCAGENT_PIPE_PATH
+0 * * * * /usr/bin/run-parts $DCAGENT_CRON_PATH/hourly.d  > $DCAGENT_PIPE_PATH
 
 # Daily: run all scripts in daily.d at 06:00
-0 6 * * * /usr/bin/run-parts $DCAGENT_CRON_PATH/daily.d   2>/dev/null > $DCAGENT_PIPE_PATH
+0 6 * * * /usr/bin/run-parts $DCAGENT_CRON_PATH/daily.d   > $DCAGENT_PIPE_PATH
 
 # Weekly: Sundays at 06:00
-0 6 * * 0 /usr/bin/run-parts $DCAGENT_CRON_PATH/weekly.d  2>/dev/null > $DCAGENT_PIPE_PATH
+0 6 * * 0 /usr/bin/run-parts $DCAGENT_CRON_PATH/weekly.d  > $DCAGENT_PIPE_PATH
 
 # Monthly: 1st day of month at 06:00
-0 6 1 * * /usr/bin/run-parts $DCAGENT_CRON_PATH/monthly.d 2>/dev/null > $DCAGENT_PIPE_PATH
+0 6 1 * * /usr/bin/run-parts $DCAGENT_CRON_PATH/monthly.d > $DCAGENT_PIPE_PATH
 
 # Yearly: Jan 1st at 06:00
-0 6 1 1 * /usr/bin/run-parts $DCAGENT_CRON_PATH/yearly.d  2>/dev/null > $DCAGENT_PIPE_PATH
+0 6 1 1 * /usr/bin/run-parts $DCAGENT_CRON_PATH/yearly.d  > $DCAGENT_PIPE_PATH
