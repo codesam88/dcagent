@@ -34,7 +34,7 @@ class HeartbeatState:
 
     def _next_seq(self) -> int:
         with self.lock:
-            self.seq += 1
+            self.seq = self.seq + 1 % 1000
             return self.seq
 
     def _read_state(self) -> tuple[dict, set]:

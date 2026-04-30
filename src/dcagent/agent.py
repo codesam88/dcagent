@@ -428,12 +428,12 @@ def run_bot(
             daemon=True,
         ).start()
 
-    hb_state.start(rpc, accid, our_addr)
+    bot_name = rpc.get_config(accid, "displayname") or APP_NAME
+    hb_state.start(rpc, accid, f"{out_addr}({bot_name})")
 
     # Send startup message to alert chats
     chat_ids = _bot._get_alert_chats(rpc, accid)
     if chat_ids:
-        bot_name = rpc.get_config(accid, "displayname") or APP_NAME
         startup_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         startup_msg = f"{bot_name} started at {startup_time}"
         for chat_id in chat_ids:
