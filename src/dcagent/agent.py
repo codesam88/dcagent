@@ -166,6 +166,7 @@ def _pipe_listener(path: str, accid: int, rpc: Rpc, status_map: dict, alert_map:
 
 
 def _on_new_message(bot: Bot, accid: int, event) -> None:
+    """Log received chat messages, especially to unknown chat types"""
     msg = event.msg
     if not msg.text:
         return
@@ -177,10 +178,10 @@ def _on_new_message(bot: Bot, accid: int, event) -> None:
     elif msg.chat_id in _bot._get_heartbeat_chats(bot.rpc, accid):
         tag = "<heartbeat>"
     else:
-        log.debug("Received message from unknown chat %d, ignoring", msg.chat_id)
+        log.warn("Received message from unknown chat %d, ignoring", msg.chat_id)
         return
 
-    bot.logger.info("Received message in chat %s %s: %r", msg.chat_id, tag, msg.text[:80])
+    log.debug("Received message in chat %s %s: %r", msg.chat_id, tag, msg.text[:80])
 
 
 def _on_help(bot: Bot, accid: int, event) -> None:

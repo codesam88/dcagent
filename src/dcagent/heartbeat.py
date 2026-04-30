@@ -67,7 +67,7 @@ class HeartbeatState:
             log.warning("Heartbeat alert but no alert chats configured: %s", text)
             return
         for chat_id in chat_ids:
-            log.info("Heartbeat alert to chat %d: %r", chat_id, text[:80])
+            log.debug("Heartbeat alert to chat %d: %r", chat_id, text[:80])
             rpc.send_msg(accid, chat_id, MsgData(text=text))
 
     def sender_thread(self, rpc: Rpc, accid: int, our_addr: str) -> None:
@@ -104,10 +104,8 @@ class HeartbeatState:
             if is_master:
                 for addr, elapsed in newly_offline:
                     mins = int(elapsed / 60)
-                    log.warning("Heartbeat: node offline: %s (last seen %dm ago)", addr, mins)
                     self._forward_alert(f"⚠️ Node offline: {addr} (last seen {mins}m ago)", accid, rpc)
                 for addr in newly_recovered:
-                    log.info("Heartbeat: node recovered: %s", addr)
                     self._forward_alert(f"✅ Node recovered: {addr}", accid, rpc)
 
     def make_handler(self):
