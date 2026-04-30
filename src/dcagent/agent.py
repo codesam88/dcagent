@@ -429,7 +429,7 @@ def run_bot(
         ).start()
 
     bot_name = rpc.get_config(accid, "displayname") or APP_NAME
-    hb_state.start(rpc, accid, f"{out_addr}({bot_name})")
+    hb_state.start(rpc, accid, f"{our_addr}({bot_name})")
 
     # Send startup message to alert chats
     chat_ids = _bot._get_alert_chats(rpc, accid)
