@@ -1,0 +1,78 @@
+# Example Home Assistant automations using dcagent bridge.
+# Adjust entity IDs to your installation.
+
+- alias: "dcagent leak alert"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.leak_kitchen
+      to: "on"
+  action:
+    - service: rest_command.dcagent_alert
+      data:
+        category: "ha-leak-kitchen"
+        message: "water leak detected"
+
+- alias: "dcagent leak clear"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.leak_kitchen
+      to: "off"
+  action:
+    - service: rest_command.dcagent_alert
+      data:
+        category: "ha-leak-kitchen"
+        message: ""
+
+- alias: "dcagent smoke alert"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.smoke_living
+      to: "on"
+  action:
+    - service: rest_command.dcagent_alert
+      data:
+        category: "ha-smoke-living"
+        message: "smoke detected"
+
+- alias: "dcagent smoke clear"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.smoke_living
+      to: "off"
+  action:
+    - service: rest_command.dcagent_alert
+      data:
+        category: "ha-smoke-living"
+        message: ""
+
+- alias: "dcagent UPS on battery"
+  trigger:
+    - platform: state
+      entity_id: sensor.ups_status
+      to: "OB"
+  action:
+    - service: rest_command.dcagent_alert
+      data:
+        category: "ha-ups-power"
+        message: "UPS on battery"
+
+- alias: "dcagent UPS clear"
+  trigger:
+    - platform: state
+      entity_id: sensor.ups_status
+      to: "OL"
+  action:
+    - service: rest_command.dcagent_alert
+      data:
+        category: "ha-ups-power"
+        message: ""
+
+- alias: "dcagent HA status heartbeat"
+  trigger:
+    - platform: time_pattern
+      minutes: "/5"
+  action:
+    - service: rest_command.dcagent_status
+      data:
+        key: "40_ha"
+        value: "ok"

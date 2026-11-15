@@ -181,6 +181,11 @@ multiple/parallel alarm types.
 examples/actions/disk-space-alert > /run/dcagent/dcagent.pipe
 ```
 
+## Home Assistant
+
+See [examples/home-assistant/README.md](examples/home-assistant/README.md) for a
+loopback HTTP bridge (and MQTT alternative) exposing alerts and status to dcagent.
+
 ## Deployment
 
 To run dcagent as a system service, use the provided `setup.sh` helper.

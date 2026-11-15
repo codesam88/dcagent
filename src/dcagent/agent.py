@@ -8,6 +8,7 @@ patch then delegates to bot.main().
 To use dcagent without the agent layer (bare event loop), run bot.main() directly.
 """
 
+import errno
 import logging
 import os
 import stat
@@ -34,12 +35,26 @@ _testmode = False
 
 def _ensure_pipe(path: str) -> None:
     if os.path.exists(path):
-        if not stat.S_ISFIFO(os.stat(path).st_mode):
+        try:
+            st_mode = os.stat(path).st_mode
+        except OSError:
+            st_mode = 0
+        if not stat.S_ISFIFO(st_mode):
             log.warning("%s exists but is not a FIFO — removing it", path)
             os.remove(path)
             os.mkfifo(path)
     else:
         os.mkfifo(path)
+
+    # Best-effort: group-writable pipe (0620) so members of the dcagent group
+    # can write without making the pipe world-writable.
+    try:
+        os.chmod(path, 0o620)
+    except OSError as exc:
+        if exc.errno == errno.EPERM:
+            log.warning("Could not chmod %s to 0620: %s", path, exc)
+        else:
+            log.debug("Could not chmod %s to 0620: %s", path, exc)
 
 
 def _handle_alert_state(category: str, message: str, alert_map: dict[str, str]) -> str | None:

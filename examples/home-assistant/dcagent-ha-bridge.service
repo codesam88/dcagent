@@ -1,0 +1,17 @@
+[Unit]
+Description=dcagent Home Assistant bridge
+BindsTo=dcagent.service
+After=dcagent.service
+PartOf=dcagent.service
+
+[Service]
+Type=simple
+User=dcagent
+SupplementaryGroups=dcagent
+EnvironmentFile=/etc/dcagent/ha-bridge.env
+ExecStart=/usr/local/bin/python3 /etc/dcagent/ha-bridge.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
