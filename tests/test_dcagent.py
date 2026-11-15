@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from dcagent.agent import _handle_alert_state, _socket_dispatch
+from dcagent.agent import _ensure_pipe, _handle_alert_state
 from dcagent.bot import (
     AgentError,
     _add_admin_chat,
@@ -28,8 +28,7 @@ def test_parser_defaults():
     args = parser.parse_args(["serve"])
     assert args.subcommand == "serve"
     assert args.log_level == "info"
-    assert args.listen_socket is None
-    assert args.listen_addr is None
+    assert args.pipe_path is None
 
 
 def test_parser_init():
@@ -74,24 +73,6 @@ def test_parser_admin_with_invite():
     args = _build_parser().parse_args(["admin", "https://i.delta.chat/#ABC"])
     assert args.subcommand == "admin"
     assert args.invite == "https://i.delta.chat/#ABC"
-
-
-def test_parser_serve_socket_unix():
-    args = _build_parser().parse_args(["serve", "--listen-socket", "/tmp/test.sock"])
-    assert args.listen_socket == "/tmp/test.sock"
-    assert args.listen_addr is None
-
-
-def test_parser_serve_socket_inet():
-    args = _build_parser().parse_args(["serve", "--listen-addr", "0.0.0.0:5000"])
-    assert args.listen_addr == "0.0.0.0:5000"
-    assert args.listen_socket is None
-
-
-def test_parser_serve_socket_both():
-    args = _build_parser().parse_args(["serve", "--listen-socket", "/tmp/test.sock", "--listen-addr", "0.0.0.0:5000"])
-    assert args.listen_socket == "/tmp/test.sock"
-    assert args.listen_addr == "0.0.0.0:5000"
 
 
 def test_parser_log_file():
@@ -297,99 +278,6 @@ def test_get_account_no_accounts_raises():
         _get_account(rpc)
 
 
-# ---------------------------------------------------------------------------
-# _socket_dispatch
-# ---------------------------------------------------------------------------
-
-
-def test_socket_dispatch_alert_success():
-    """Socket alert dispatch should return ok response."""
-    rpc = MagicMock()
-    rpc.get_config.return_value = "42"
-    alert_map = {}
-    result = _socket_dispatch("alert disk 95% full", accid=1, rpc=rpc, status_map={}, alert_map=alert_map)
-    assert "ok" in result
-    assert "alert sent" in result
-
-
-def test_socket_dispatch_alert_no_category():
-    """Socket alert without category should return error."""
-    result = _socket_dispatch("alert", accid=1, rpc=MagicMock(), status_map={}, alert_map={})
-    assert "error" in result
-    assert "requires category" in result
-
-
-def test_socket_dispatch_status_success():
-    """Socket status dispatch should return ok response."""
-    rpc = MagicMock()
-    status_map = {}
-    result = _socket_dispatch("status cpu 45%", accid=1, rpc=rpc, status_map=status_map, alert_map={})
-    assert "ok" in result
-    assert "updated" in result
-    assert status_map["cpu"] == "45%"
-
-
-def test_socket_dispatch_status_missing_args():
-    """Socket status without key and value should return error."""
-    result = _socket_dispatch("status", accid=1, rpc=MagicMock(), status_map={}, alert_map={})
-    assert "error" in result
-    assert "requires a key and value" in result
-
-
-def test_socket_dispatch_unknown_command():
-    """Socket dispatch with unknown command should return error."""
-    result = _socket_dispatch("unknown test", accid=1, rpc=MagicMock(), status_map={}, alert_map={})
-    assert "error" in result
-    assert "unknown command" in result
-
-
-def test_socket_dispatch_config_get():
-    """Socket dispatch config get should return the configuration value."""
-    rpc = MagicMock()
-    rpc.get_config.return_value = "example@domain.com"
-    result = _socket_dispatch("config addr", accid=1, rpc=rpc, status_map={}, alert_map={})
-    assert "ok:" in result
-    assert "addr='example@domain.com'" in result
-    rpc.get_config.assert_called_once_with(1, "addr")
-
-
-def test_socket_dispatch_config_set():
-    """Socket dispatch config set should update and return the value."""
-    rpc = MagicMock()
-    rpc.get_config.return_value = "updated_value"
-    result = _socket_dispatch("config mykey newvalue", accid=1, rpc=rpc, status_map={}, alert_map={})
-    assert "ok:" in result
-    assert "mykey='updated_value'" in result
-    rpc.set_config.assert_called_once_with(1, "mykey", "newvalue")
-    rpc.get_config.assert_called_once_with(1, "mykey")
-
-
-def test_socket_dispatch_config_dump_all():
-    """Socket dispatch config without key should dump all config keys."""
-
-    rpc = MagicMock()
-    rpc.get_config.side_effect = lambda accid, key: {
-        "addr": "test@example.com",
-        "displayname": "TestBot",
-        "sys.config_keys": "addr displayname selfstatus",
-        "selfstatus": "online",
-    }.get(key, "")
-
-    result = _socket_dispatch("config", accid=1, rpc=rpc, status_map={}, alert_map={})
-    assert "ok:" in result
-    assert "addr='test@example.com'" in result
-    assert "displayname='TestBot'" in result
-    assert "selfstatus='online'" in result
-
-
-def test_socket_dispatch_version():
-    """Socket dispatch version should return the version string."""
-    rpc = MagicMock()
-    result = _socket_dispatch("version", accid=1, rpc=rpc, status_map={}, alert_map={})
-    assert "ok:" in result
-    assert "dcagent" in result
-
-
 # Chat command handlers
 def test_on_version_sends_version_string():
     """Chat /version command should send version string."""
@@ -444,84 +332,6 @@ def test_on_ping_responds_with_pong():
     assert "Pong" in msg_data.text or "🏓" in msg_data.text
 
 
-# Testmode socket commands
-def test_socket_dispatch_dcmsg_requires_testmode():
-    """dcmsg command should be rejected when testmode is False."""
-    import dcagent.agent as agent
-
-    rpc = MagicMock()
-    original_testmode = agent._testmode
-    try:
-        agent._testmode = False
-        result = _socket_dispatch("dcmsg hello", accid=1, rpc=rpc, status_map={}, alert_map={})
-        assert "error" in result
-        assert "unknown command" in result
-    finally:
-        agent._testmode = original_testmode
-
-
-def test_socket_dispatch_dcmsg_with_testmode():
-    """dcmsg command should send to admin chats when testmode is True."""
-    import dcagent.agent as agent
-    from dcagent import bot
-
-    rpc = MagicMock()
-    rpc.get_config.return_value = "10,20"  # Two admin chats
-
-    # Mock the _get_admin_chats function
-    original_get_admin_chats = bot._get_admin_chats
-    original_testmode = agent._testmode
-    bot._get_admin_chats = MagicMock(return_value=[10, 20])
-
-    try:
-        agent._testmode = True
-        result = _socket_dispatch("dcmsg test message", accid=1, rpc=rpc, status_map={}, alert_map={})
-        assert "ok:" in result
-        assert "sent to 2 admin chat(s)" in result
-        # Verify send_msg was called for each admin chat
-        assert rpc.send_msg.call_count == 2
-    finally:
-        bot._get_admin_chats = original_get_admin_chats
-        agent._testmode = original_testmode
-
-
-def test_socket_dispatch_dcmsg_requires_message():
-    """dcmsg command should require a message argument."""
-    import dcagent.agent as agent
-
-    rpc = MagicMock()
-    original_testmode = agent._testmode
-    try:
-        agent._testmode = True
-        result = _socket_dispatch("dcmsg", accid=1, rpc=rpc, status_map={}, alert_map={})
-        assert "error" in result
-        assert "requires a message" in result
-    finally:
-        agent._testmode = original_testmode
-
-
-def test_socket_dispatch_dcmsg_no_admin_chats():
-    """dcmsg command should fail if no admin chats are configured."""
-    import dcagent.agent as agent
-    from dcagent import bot
-
-    rpc = MagicMock()
-
-    # Mock the _get_admin_chats function to return empty list
-    original_get_admin_chats = bot._get_admin_chats
-    original_testmode = agent._testmode
-    bot._get_admin_chats = MagicMock(return_value=[])
-
-    try:
-        agent._testmode = True
-        result = _socket_dispatch("dcmsg test", accid=1, rpc=rpc, status_map={}, alert_map={})
-        assert "error" in result
-        assert "no admin chats" in result
-    finally:
-        bot._get_admin_chats = original_get_admin_chats
-        agent._testmode = original_testmode
-
-
 def test_parser_testmode_flag():
     """Parser should accept --testmode flag on serve command."""
     parser = _build_parser()
@@ -534,3 +344,35 @@ def test_parser_testmode_default():
     parser = _build_parser()
     args = parser.parse_args(["serve"])
     assert args.testmode is False
+
+
+# ---------------------------------------------------------------------------
+# _ensure_pipe
+# ---------------------------------------------------------------------------
+
+
+def test_ensure_pipe_creates_fifo(tmp_path):
+    import stat as _stat
+
+    path = str(tmp_path / "test.pipe")
+    _ensure_pipe(path)
+    assert _stat.S_ISFIFO(__import__("os").stat(path).st_mode)
+
+
+def test_ensure_pipe_removes_stale_non_fifo(tmp_path):
+    import os as _os
+    import stat as _stat
+
+    path = str(tmp_path / "test.pipe")
+    with open(path, "w") as fh:
+        fh.write("x")
+    _ensure_pipe(path)
+    assert _stat.S_ISFIFO(_os.stat(path).st_mode)
+
+
+def test_ensure_pipe_chmods_0620(tmp_path):
+    import os as _os
+
+    path = str(tmp_path / "test.pipe")
+    _ensure_pipe(path)
+    assert (_os.stat(path).st_mode & 0o777) == 0o620

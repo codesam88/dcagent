@@ -1,0 +1,69 @@
+#!/bin/sh
+# dcagent-send: sanitize and send a single alert/status line to the dcagent pipe.
+# Usage:
+#   dcagent-send alert <category> [message]
+#   dcagent-send status <key> <value>
+# Reads DCAGENT_PIPE_PATH from environment (default /run/dcagent/dcagent.pipe).
+
+set -eu
+
+PIPE="${DCAGENT_PIPE_PATH:-/run/dcagent/dcagent.pipe}"
+
+if [ "$#" -lt 1 ]; then
+    echo "usage: dcagent-send alert|status ..." >&2
+    exit 2
+fi
+
+cmd="$1"
+shift
+
+case "$cmd" in
+    alert)
+        if [ "$#" -lt 1 ]; then
+            echo "dcagent-send: alert requires category" >&2
+            exit 2
+        fi
+        category="$1"
+        shift
+        # sanitize category
+        category=$(printf '%s' "$category" | tr -cd 'A-Za-z0-9_.:-' | cut -c1-64)
+        if [ -z "$category" ]; then
+            echo "dcagent-send: invalid category" >&2
+            exit 2
+        fi
+        message="$*"
+        # strip newlines, truncate
+        message=$(printf '%s' "$message" | tr '\n\r' '  ' | cut -c1-500)
+        if [ -n "$message" ]; then
+            line="alert $category $message"
+        else
+            line="alert $category"
+        fi
+        ;;
+    status)
+        if [ "$#" -lt 2 ]; then
+            echo "dcagent-send: status requires key and value" >&2
+            exit 2
+        fi
+        key="$1"
+        shift
+        key=$(printf '%s' "$key" | tr -d '[:space:]' | cut -c1-64)
+        if [ -z "$key" ]; then
+            echo "dcagent-send: invalid key" >&2
+            exit 2
+        fi
+        value="$*"
+        value=$(printf '%s' "$value" | tr '\n\r' '  ' | cut -c1-500)
+        line="status $key $value"
+        ;;
+    *)
+        echo "dcagent-send: unknown command $cmd" >&2
+        exit 2
+        ;;
+esac
+
+# flock with timeout
+(
+    flock -w 5 9 || exit 1
+    printf '%s\n' "$line" >&9
+) 9>"$PIPE"

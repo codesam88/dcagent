@@ -1,0 +1,28 @@
+# MQTT alternative: HA publishes JSON to a topic; a subscriber parses the
+# payload and runs the dcagent-send helper (the only helper involved).
+# Requires an MQTT broker (already running) and mosquitto_sub.
+
+# Home Assistant automation example:
+# - service: mqtt.publish
+#   data:
+#     topic: dcagent/alert
+#     payload: '{"category":"ha-leak-kitchen","message":"water leak detected"}'
+#
+# Subscriber (run as dcagent user, e.g. via systemd; dcagent-send on PATH):
+# mosquitto_sub -h 127.0.0.1 -t 'dcagent/#' -F '%t %p' | while read -r topic payload; do
+#   case "$topic" in
+#     dcagent/alert)
+#       printf '%s\n' "$payload" | python3 -c 'import json, subprocess, sys; d = json.load(sys.stdin); subprocess.run(["dcagent-send", "alert", str(d.get("category", "")), str(d.get("message", ""))])' ;;
+#     dcagent/status)
+#       printf '%s\n' "$payload" | python3 -c 'import json, subprocess, sys; d = json.load(sys.stdin); subprocess.run(["dcagent-send", "status", str(d.get("key", "")), str(d.get("value", ""))])' ;;
+#   esac
+# done
+#
+# Notes:
+# - Validate every payload before sending: the category must match
+#   ^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$ and keys/values must be single-line and
+#   within the length limits (see README). dcagent-send only sanitizes as a
+#   fallback; validation belongs on the publisher side.
+# - If the broker is not on loopback, enable TLS and authentication
+#   (mosquitto: cafile/certfile, allow_anonymous false, per-user ACLs) and
+#   only let trusted clients publish to dcagent/#.

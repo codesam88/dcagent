@@ -1,0 +1,19 @@
+# Home Assistant REST commands for dcagent bridge (loopback).
+# Requires in secrets.yaml (see secrets.yaml.example):
+#   dcagent_auth_header: "Bearer <same token as the bridge>"
+rest_command:
+  dcagent_alert:
+    url: "http://127.0.0.1:8099/alert"
+    method: POST
+    headers:
+      Authorization: !secret dcagent_auth_header
+      Content-Type: "application/json"
+    payload: '{"category": "{{ category }}", "message": "{{ message }}"}'
+
+  dcagent_status:
+    url: "http://127.0.0.1:8099/status"
+    method: POST
+    headers:
+      Authorization: !secret dcagent_auth_header
+      Content-Type: "application/json"
+    payload: '{"key": "{{ key }}", "value": "{{ value }}"}'
